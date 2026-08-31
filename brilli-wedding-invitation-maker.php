@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.2.0
+ * Version: 1.2.1
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.2.0';
+        const VERSION = '1.2.1';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
@@ -92,7 +92,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'manage_options',
                 self::MENU_SLUG,
                 array($this, 'render_admin_page'),
-                plugin_dir_url(__FILE__) . 'assets/logo-bav-white.png',
+                'dashicons-heart',
                 58
             );
         }
