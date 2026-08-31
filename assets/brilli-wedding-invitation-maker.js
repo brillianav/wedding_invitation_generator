@@ -108,15 +108,26 @@
 
         if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(textarea.value).then(function () {
-                setNotice(message);
+                setNotice(message, 'success');
             }).catch(function () {
                 document.execCommand('copy');
-                setNotice(message);
+                setNotice(message, 'success');
             });
         } else {
             document.execCommand('copy');
-            setNotice(message);
+            setNotice(message, 'success');
         }
+    }
+
+    function flashButtonLabel(button, temporaryLabel) {
+        var originalLabel = button.getAttribute('data-original-label') || button.textContent;
+
+        button.setAttribute('data-original-label', originalLabel);
+        button.textContent = temporaryLabel;
+
+        window.setTimeout(function () {
+            button.textContent = originalLabel;
+        }, 1600);
     }
 
     function init(wrapper) {
@@ -134,9 +145,15 @@
         var whatsappLinks = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__whatsapp'));
         var notice = wrapper.querySelector('.brilli-wim__notice');
 
-        function setNotice(text) {
+        function setNotice(text, state) {
             if (notice) {
                 notice.textContent = text || '';
+
+                if (text && state) {
+                    notice.setAttribute('data-state', state);
+                } else {
+                    notice.removeAttribute('data-state');
+                }
             }
         }
 
@@ -180,10 +197,13 @@
             var encodedName;
 
             if (!name) {
-                setNotice('Nama wajib diisi.');
+                setNotice('Masukkan nama tamu untuk membuat undangan.', 'error');
+                nameInput.setAttribute('aria-invalid', 'true');
                 nameInput.focus();
                 return false;
             }
+
+            nameInput.removeAttribute('aria-invalid');
 
             encodedName = encodeGuestName(name);
             invitationUrls = {
@@ -215,7 +235,7 @@
             });
 
             result.hidden = false;
-            setNotice('Tiga versi undangan berhasil dibuat.');
+            setNotice('Tiga versi undangan berhasil dibuat dan siap dibagikan.', 'success');
             return true;
         }
 
@@ -250,6 +270,16 @@
 
         generateButton.addEventListener('click', generate);
 
+        nameInput.addEventListener('input', function () {
+            if (nameInput.value.trim()) {
+                nameInput.removeAttribute('aria-invalid');
+
+                if (notice && notice.getAttribute('data-state') === 'error') {
+                    setNotice('', '');
+                }
+            }
+        });
+
         [nameInput, phoneInput].forEach(function (input) {
             input.addEventListener('keydown', function (event) {
                 if (event.key === 'Enter') {
@@ -278,6 +308,7 @@
                     setNotice,
                     language === 'en' ? 'English message copied.' : 'Kalimat Indonesia berhasil disalin.'
                 );
+                flashButtonLabel(button, language === 'en' ? 'Copied' : 'Tersalin');
             });
         });
 

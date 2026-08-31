@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.2.2
+ * Version: 1.3.0
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.2.2';
+        const VERSION = '1.3.0';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
@@ -428,28 +428,76 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             ob_start();
             ?>
             <div id="<?php echo esc_attr($wrapper_id); ?>" class="brilli-wim" data-settings="<?php echo esc_attr(wp_json_encode($settings)); ?>">
-                <div class="brilli-wim__field">
-                    <label for="<?php echo esc_attr($wrapper_id); ?>-name">Nama</label>
-                    <input id="<?php echo esc_attr($wrapper_id); ?>-name" class="brilli-wim__name" type="text" placeholder="Masukkan nama tamu" autocomplete="name">
-                </div>
+                <header class="brilli-wim__intro">
+                    <div class="brilli-wim__intro-copy">
+                        <span class="brilli-wim__eyebrow"><i aria-hidden="true"></i> Wedding invitation studio</span>
+                        <h2>Buat pesan undangan yang terasa personal.</h2>
+                        <p>Isi data tamu sekali, lalu pilih gaya pesan dan bahasa yang paling sesuai.</p>
+                    </div>
+                    <div class="brilli-wim__monogram" aria-hidden="true">
+                        <span>B</span><i>×</i><span>M</span>
+                    </div>
+                </header>
 
-                <div class="brilli-wim__field">
-                    <label for="<?php echo esc_attr($wrapper_id); ?>-phone">Nomor HP / WhatsApp</label>
-                    <input id="<?php echo esc_attr($wrapper_id); ?>-phone" class="brilli-wim__phone" type="tel" placeholder="Contoh: 08123456789" autocomplete="tel">
-                </div>
+                <section class="brilli-wim__composer" aria-labelledby="<?php echo esc_attr($wrapper_id); ?>-guest-heading">
+                    <div class="brilli-wim__step-heading">
+                        <span>01</span>
+                        <div>
+                            <h3 id="<?php echo esc_attr($wrapper_id); ?>-guest-heading">Masukkan data tamu</h3>
+                            <p>Nama dipakai untuk mempersonalisasi tautan dan seluruh template pesan.</p>
+                        </div>
+                    </div>
 
-                <button type="button" class="brilli-wim__generate"><?php echo esc_html($options['generate_button']); ?></button>
-
-                <div class="brilli-wim__result" hidden>
-                    <div class="brilli-wim__grid">
+                    <div class="brilli-wim__form-grid">
                         <div class="brilli-wim__field">
-                            <label>URL Indonesia</label>
-                            <input class="brilli-wim__url brilli-wim__url--id" type="text" readonly>
+                            <label for="<?php echo esc_attr($wrapper_id); ?>-name">Nama tamu</label>
+                            <input id="<?php echo esc_attr($wrapper_id); ?>-name" class="brilli-wim__name" type="text" placeholder="Contoh: Christopher Emmanuel" autocomplete="name" required aria-required="true">
                         </div>
 
                         <div class="brilli-wim__field">
-                            <label>URL English</label>
-                            <input class="brilli-wim__url brilli-wim__url--en" type="text" readonly>
+                            <label for="<?php echo esc_attr($wrapper_id); ?>-phone">Nomor WhatsApp <span>Opsional</span></label>
+                            <input id="<?php echo esc_attr($wrapper_id); ?>-phone" class="brilli-wim__phone" type="tel" placeholder="Contoh: 08123456789" autocomplete="tel" inputmode="tel">
+                        </div>
+                    </div>
+
+                    <div class="brilli-wim__generate-row">
+                        <button type="button" class="brilli-wim__generate">
+                            <span><?php echo esc_html($options['generate_button']); ?></span>
+                            <span aria-hidden="true">→</span>
+                        </button>
+                        <p class="brilli-wim__privacy">Data hanya diproses di browser dan tidak dikirim ke server.</p>
+                    </div>
+
+                    <p class="brilli-wim__notice" aria-live="polite" aria-atomic="true"></p>
+                </section>
+
+                <div class="brilli-wim__result" hidden>
+                    <div class="brilli-wim__result-heading">
+                        <div class="brilli-wim__step-heading">
+                            <span>02</span>
+                            <div>
+                                <h3>Pesan siap dibagikan</h3>
+                                <p>Pilih gaya, periksa isi pesan, lalu salin atau kirim melalui WhatsApp.</p>
+                            </div>
+                        </div>
+                        <span class="brilli-wim__ready"><i aria-hidden="true"></i> Siap digunakan</span>
+                    </div>
+
+                    <div class="brilli-wim__link-grid">
+                        <div class="brilli-wim__link-card">
+                            <span class="brilli-wim__language">ID</span>
+                            <div class="brilli-wim__field">
+                                <label for="<?php echo esc_attr($wrapper_id); ?>-url-id">Tautan Indonesia</label>
+                                <input id="<?php echo esc_attr($wrapper_id); ?>-url-id" class="brilli-wim__url brilli-wim__url--id" type="text" readonly>
+                            </div>
+                        </div>
+
+                        <div class="brilli-wim__link-card">
+                            <span class="brilli-wim__language">EN</span>
+                            <div class="brilli-wim__field">
+                                <label for="<?php echo esc_attr($wrapper_id); ?>-url-en">English invitation link</label>
+                                <input id="<?php echo esc_attr($wrapper_id); ?>-url-en" class="brilli-wim__url brilli-wim__url--en" type="text" readonly>
+                            </div>
                         </div>
                     </div>
 
@@ -480,30 +528,44 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                             data-template="<?php echo esc_attr($template_key); ?>"
                             <?php echo 0 === $panel_index ? '' : 'hidden'; ?>
                         >
-                            <h2 class="brilli-wim__panel-title"><?php echo esc_html($template_label); ?></h2>
+                            <h4 class="brilli-wim__panel-title"><?php echo esc_html($template_label); ?></h4>
 
-                            <div class="brilli-wim__block">
-                                <h3>Kalimat Indonesia</h3>
-                                <textarea class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" rows="14" readonly></textarea>
-                                <div class="brilli-wim__actions">
-                                    <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="id"><?php echo esc_html($options['copy_id_button']); ?></button>
-                                    <a class="brilli-wim__whatsapp" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_id_button']); ?></a>
-                                </div>
-                            </div>
+                            <div class="brilli-wim__message-grid">
+                                <article class="brilli-wim__message-card">
+                                    <div class="brilli-wim__message-heading">
+                                        <span class="brilli-wim__language">ID</span>
+                                        <div>
+                                            <h5>Bahasa Indonesia</h5>
+                                            <p>Untuk tamu berbahasa Indonesia.</p>
+                                        </div>
+                                    </div>
+                                    <label class="brilli-wim__sr-only" for="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-id">Pesan <?php echo esc_html($template_label); ?> bahasa Indonesia</label>
+                                    <textarea id="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-id" class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" rows="14" readonly></textarea>
+                                    <div class="brilli-wim__actions">
+                                        <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="id"><?php echo esc_html($options['copy_id_button']); ?></button>
+                                        <a class="brilli-wim__whatsapp" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_id_button']); ?></a>
+                                    </div>
+                                </article>
 
-                            <div class="brilli-wim__block">
-                                <h3>English Message</h3>
-                                <textarea class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" rows="14" readonly></textarea>
-                                <div class="brilli-wim__actions">
-                                    <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="en"><?php echo esc_html($options['copy_en_button']); ?></button>
-                                    <a class="brilli-wim__whatsapp" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_en_button']); ?></a>
-                                </div>
+                                <article class="brilli-wim__message-card">
+                                    <div class="brilli-wim__message-heading">
+                                        <span class="brilli-wim__language">EN</span>
+                                        <div>
+                                            <h5>English</h5>
+                                            <p>For English-speaking guests.</p>
+                                        </div>
+                                    </div>
+                                    <label class="brilli-wim__sr-only" for="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-en"><?php echo esc_html($template_label); ?> English message</label>
+                                    <textarea id="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-en" class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" rows="14" readonly></textarea>
+                                    <div class="brilli-wim__actions">
+                                        <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="en"><?php echo esc_html($options['copy_en_button']); ?></button>
+                                        <a class="brilli-wim__whatsapp" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_en_button']); ?></a>
+                                    </div>
+                                </article>
                             </div>
                         </section>
                         <?php $panel_index++; ?>
                     <?php endforeach; ?>
-
-                    <p class="brilli-wim__notice" aria-live="polite"></p>
                 </div>
             </div>
             <?php
