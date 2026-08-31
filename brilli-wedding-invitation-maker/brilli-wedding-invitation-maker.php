@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.0.0';
+        const VERSION = '1.1.0';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
@@ -42,8 +42,12 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'url_param' => 'to',
                 'custom_url_id' => '',
                 'custom_url_en' => '',
-                'message_id' => "Kepada Yth.\nBapak/Ibu/Saudara/i {name}\n\nHari bahagia kami akan segera tiba, dan dengan penuh kebahagiaan kami mengundang Bapak/Ibu/Saudara/i untuk hadir dalam acara pernikahan:\n\n📅 Brillian & Midiya\n🗓 Sabtu, 3 Oktober 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kec. Kutorejo, Kab. Mojokerto\n\nSilakan akses undangan digital melalui link berikut:\n{invitation_url}\n\nDoa restu dan kehadiran Bapak/Ibu/Saudara/i akan menjadi bagian yang sangat berarti dalam hari bahagia kami.\n\nTerima kasih 🙏",
-                'message_en' => "Dear Mr./Mrs./Ms. {name},\n\nOur special day is coming soon, and with great joy, we would like to invite you to attend our wedding celebration:\n\n📅 Brillian & Midiya\n🗓 Saturday, October 3, 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kutorejo District, Mojokerto Regency\n\nPlease access our digital invitation through the link below:\n{invitation_url}\n\nYour presence and prayers will mean so much to us on this special day.\n\nThank you 🙏",
+                'message_formal_id' => "Kepada Yth.\nBapak/Ibu/Saudara/i {name}\n\nDengan penuh kebahagiaan, kami mengundang Bapak/Ibu/Saudara/i untuk hadir dan memberikan doa restu pada acara pernikahan kami:\n\n💍 Brillian & Midiya\n🗓 Sabtu, 3 Oktober 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kec. Kutorejo, Kab. Mojokerto\n\nUndangan digital dapat diakses melalui tautan berikut:\n{invitation_url}\n\nKehadiran dan doa restu Bapak/Ibu/Saudara/i merupakan kehormatan serta kebahagiaan bagi kami.\n\nTerima kasih.",
+                'message_formal_en' => "Dear Mr./Mrs./Ms. {name},\n\nWith great joy, we cordially invite you to attend and share your blessings at our wedding celebration:\n\n💍 Brillian & Midiya\n🗓 Saturday, October 3, 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kutorejo District, Mojokerto Regency\n\nPlease view our digital invitation through the link below:\n{invitation_url}\n\nYour presence and blessings would be a great honor and joy to us.\n\nThank you.",
+                'message_casual_id' => "Halo {name}! 👋\n\nKami punya kabar bahagia: Brillian & Midiya akan menikah! Kami ingin mengajak kamu ikut merayakan hari spesial kami pada:\n\n🗓 Sabtu, 3 Oktober 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kec. Kutorejo, Kab. Mojokerto\n\nDetail lengkap acaranya ada di sini:\n{invitation_url}\n\nSemoga kamu bisa hadir dan berbagi kebahagiaan bersama kami. Sampai ketemu! 🤍",
+                'message_casual_en' => "Hi {name}! 👋\n\nWe have happy news: Brillian & Midiya are getting married! We would love for you to celebrate our special day with us on:\n\n🗓 Saturday, October 3, 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kutorejo District, Mojokerto Regency\n\nYou can find all the details here:\n{invitation_url}\n\nWe hope you can make it and share the joy with us. See you there! 🤍",
+                'message_warm_id' => "Hai {name} ✨\n\nAkhirnya hari yang kami tunggu segera tiba! Brillian & Midiya akan memulai perjalanan baru, dan rasanya belum lengkap tanpa kehadiranmu.\n\nCatat tanggalnya ya:\n🗓 Sabtu, 3 Oktober 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kec. Kutorejo, Kab. Mojokerto\n\nBuka undangannya di sini:\n{invitation_url}\n\nDatang ya—kami ingin merayakan, tertawa, dan membuat kenangan indah bersamamu! 🥰",
+                'message_warm_en' => "Hey {name} ✨\n\nThe day we have been waiting for is almost here! Brillian & Midiya are starting a new chapter, and it would not feel complete without you.\n\nSave the date:\n🗓 Saturday, October 3, 2026\n📍 Dsn/Ds. Karangdiyeng RT/RW.01, Kutorejo District, Mojokerto Regency\n\nOpen the invitation here:\n{invitation_url}\n\nCome celebrate, laugh, and make beautiful memories with us! 🥰",
                 'generate_button' => 'Generate Undangan',
                 'copy_id_button' => 'Copy Indonesia',
                 'copy_en_button' => 'Copy English',
@@ -63,7 +67,18 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 $saved = array();
             }
 
-            return wp_parse_args($saved, $this->default_options());
+            $options = wp_parse_args($saved, $this->default_options());
+
+            // Preserve customized templates from version 1.0 as the Formal tab.
+            if (!array_key_exists('message_formal_id', $saved) && isset($saved['message_id'])) {
+                $options['message_formal_id'] = $saved['message_id'];
+            }
+
+            if (!array_key_exists('message_formal_en', $saved) && isset($saved['message_en'])) {
+                $options['message_formal_en'] = $saved['message_en'];
+            }
+
+            return $options;
         }
 
         public function add_admin_menu() {
@@ -95,8 +110,12 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             $output['url_param'] = isset($input['url_param']) ? sanitize_key(trim($input['url_param'])) : $defaults['url_param'];
             $output['custom_url_id'] = isset($input['custom_url_id']) ? sanitize_text_field(trim($input['custom_url_id'])) : '';
             $output['custom_url_en'] = isset($input['custom_url_en']) ? sanitize_text_field(trim($input['custom_url_en'])) : '';
-            $output['message_id'] = isset($input['message_id']) ? wp_kses_post($input['message_id']) : $defaults['message_id'];
-            $output['message_en'] = isset($input['message_en']) ? wp_kses_post($input['message_en']) : $defaults['message_en'];
+            foreach (array('formal', 'casual', 'warm') as $template_key) {
+                foreach (array('id', 'en') as $language) {
+                    $option_key = 'message_' . $template_key . '_' . $language;
+                    $output[$option_key] = isset($input[$option_key]) ? wp_kses_post($input[$option_key]) : $defaults[$option_key];
+                }
+            }
             $output['generate_button'] = isset($input['generate_button']) ? sanitize_text_field($input['generate_button']) : $defaults['generate_button'];
             $output['copy_id_button'] = isset($input['copy_id_button']) ? sanitize_text_field($input['copy_id_button']) : $defaults['copy_id_button'];
             $output['copy_en_button'] = isset($input['copy_en_button']) ? sanitize_text_field($input['copy_en_button']) : $defaults['copy_en_button'];
@@ -192,18 +211,59 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_id">Template Kalimat Indonesia</label></th>
+                            <th colspan="2"><h2>Tab 1 — Formal</h2></th>
+                        </tr>
+
+                        <tr>
+                            <th scope="row"><label for="brilli_wim_message_formal_id">Template Formal Indonesia</label></th>
                             <td>
-                                <textarea id="brilli_wim_message_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_id]" rows="16" class="large-text code"><?php echo esc_textarea($options['message_id']); ?></textarea>
-                                <p class="description">Placeholder: <code>{name}</code>, <code>{phone}</code>, <code>{invitation_url}</code>, <code>{encoded_name}</code>.</p>
+                                <textarea id="brilli_wim_message_formal_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_formal_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_formal_id']); ?></textarea>
+                                <p class="description">Cocok untuk tamu keluarga, kolega, atau relasi. Placeholder: <code>{name}</code>, <code>{phone}</code>, <code>{invitation_url}</code>, <code>{encoded_name}</code>.</p>
                             </td>
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_en">Template Kalimat English</label></th>
+                            <th scope="row"><label for="brilli_wim_message_formal_en">Formal English Template</label></th>
                             <td>
-                                <textarea id="brilli_wim_message_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_en]" rows="16" class="large-text code"><?php echo esc_textarea($options['message_en']); ?></textarea>
-                                <p class="description">Placeholder: <code>{name}</code>, <code>{phone}</code>, <code>{invitation_url}</code>, <code>{encoded_name}</code>.</p>
+                                <textarea id="brilli_wim_message_formal_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_formal_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_formal_en']); ?></textarea>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th colspan="2"><h2>Tab 2 — Santai</h2></th>
+                        </tr>
+
+                        <tr>
+                            <th scope="row"><label for="brilli_wim_message_casual_id">Template Santai Indonesia</label></th>
+                            <td>
+                                <textarea id="brilli_wim_message_casual_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_casual_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_casual_id']); ?></textarea>
+                                <p class="description">Nada ringan untuk teman dan kenalan. Placeholder sama seperti template Formal.</p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th scope="row"><label for="brilli_wim_message_casual_en">Casual English Template</label></th>
+                            <td>
+                                <textarea id="brilli_wim_message_casual_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_casual_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_casual_en']); ?></textarea>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th colspan="2"><h2>Tab 3 — Akrab</h2></th>
+                        </tr>
+
+                        <tr>
+                            <th scope="row"><label for="brilli_wim_message_warm_id">Template Akrab Indonesia</label></th>
+                            <td>
+                                <textarea id="brilli_wim_message_warm_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_warm_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_warm_id']); ?></textarea>
+                                <p class="description">Nada paling hangat untuk sahabat dan orang terdekat. Placeholder sama seperti template Formal.</p>
+                            </td>
+                        </tr>
+
+                        <tr>
+                            <th scope="row"><label for="brilli_wim_message_warm_en">Warm English Template</label></th>
+                            <td>
+                                <textarea id="brilli_wim_message_warm_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_warm_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_warm_en']); ?></textarea>
                             </td>
                         </tr>
 
@@ -246,11 +306,28 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'urlParam' => sanitize_key($options['url_param']),
                 'customUrlId' => $options['custom_url_id'],
                 'customUrlEn' => $options['custom_url_en'],
-                'messageId' => $options['message_id'],
-                'messageEn' => $options['message_en'],
+                'messages' => array(
+                    'formal' => array(
+                        'id' => $options['message_formal_id'],
+                        'en' => $options['message_formal_en'],
+                    ),
+                    'casual' => array(
+                        'id' => $options['message_casual_id'],
+                        'en' => $options['message_casual_en'],
+                    ),
+                    'warm' => array(
+                        'id' => $options['message_warm_id'],
+                        'en' => $options['message_warm_en'],
+                    ),
+                ),
             );
 
             $wrapper_id = 'brilli-wim-' . wp_generate_uuid4();
+            $templates = array(
+                'formal' => 'Formal',
+                'casual' => 'Santai',
+                'warm' => 'Akrab',
+            );
 
             ob_start();
             ?>
@@ -280,23 +357,55 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </div>
                     </div>
 
-                    <div class="brilli-wim__block">
-                        <h3>Kalimat Indonesia</h3>
-                        <textarea class="brilli-wim__message brilli-wim__message--id" rows="14" readonly></textarea>
-                        <div class="brilli-wim__actions">
-                            <button type="button" class="brilli-wim__copy brilli-wim__copy--id"><?php echo esc_html($options['copy_id_button']); ?></button>
-                            <a class="brilli-wim__whatsapp brilli-wim__whatsapp--id" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_id_button']); ?></a>
-                        </div>
+                    <div class="brilli-wim__tabs" role="tablist" aria-label="Pilih gaya kalimat undangan">
+                        <?php $tab_index = 0; ?>
+                        <?php foreach ($templates as $template_key => $template_label) : ?>
+                            <button
+                                id="<?php echo esc_attr($wrapper_id . '-tab-' . $template_key); ?>"
+                                class="brilli-wim__tab"
+                                type="button"
+                                role="tab"
+                                aria-selected="<?php echo 0 === $tab_index ? 'true' : 'false'; ?>"
+                                aria-controls="<?php echo esc_attr($wrapper_id . '-panel-' . $template_key); ?>"
+                                tabindex="<?php echo 0 === $tab_index ? '0' : '-1'; ?>"
+                                data-template="<?php echo esc_attr($template_key); ?>"
+                            ><?php echo esc_html($template_label); ?></button>
+                            <?php $tab_index++; ?>
+                        <?php endforeach; ?>
                     </div>
 
-                    <div class="brilli-wim__block">
-                        <h3>English Message</h3>
-                        <textarea class="brilli-wim__message brilli-wim__message--en" rows="14" readonly></textarea>
-                        <div class="brilli-wim__actions">
-                            <button type="button" class="brilli-wim__copy brilli-wim__copy--en"><?php echo esc_html($options['copy_en_button']); ?></button>
-                            <a class="brilli-wim__whatsapp brilli-wim__whatsapp--en" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_en_button']); ?></a>
-                        </div>
-                    </div>
+                    <?php $panel_index = 0; ?>
+                    <?php foreach ($templates as $template_key => $template_label) : ?>
+                        <section
+                            id="<?php echo esc_attr($wrapper_id . '-panel-' . $template_key); ?>"
+                            class="brilli-wim__panel"
+                            role="tabpanel"
+                            aria-labelledby="<?php echo esc_attr($wrapper_id . '-tab-' . $template_key); ?>"
+                            data-template="<?php echo esc_attr($template_key); ?>"
+                            <?php echo 0 === $panel_index ? '' : 'hidden'; ?>
+                        >
+                            <h2 class="brilli-wim__panel-title"><?php echo esc_html($template_label); ?></h2>
+
+                            <div class="brilli-wim__block">
+                                <h3>Kalimat Indonesia</h3>
+                                <textarea class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" rows="14" readonly></textarea>
+                                <div class="brilli-wim__actions">
+                                    <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="id"><?php echo esc_html($options['copy_id_button']); ?></button>
+                                    <a class="brilli-wim__whatsapp" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_id_button']); ?></a>
+                                </div>
+                            </div>
+
+                            <div class="brilli-wim__block">
+                                <h3>English Message</h3>
+                                <textarea class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" rows="14" readonly></textarea>
+                                <div class="brilli-wim__actions">
+                                    <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="en"><?php echo esc_html($options['copy_en_button']); ?></button>
+                                    <a class="brilli-wim__whatsapp" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" href="#" target="_blank" rel="noopener noreferrer"><?php echo esc_html($options['whatsapp_en_button']); ?></a>
+                                </div>
+                            </div>
+                        </section>
+                        <?php $panel_index++; ?>
+                    <?php endforeach; ?>
 
                     <p class="brilli-wim__notice" aria-live="polite"></p>
                 </div>

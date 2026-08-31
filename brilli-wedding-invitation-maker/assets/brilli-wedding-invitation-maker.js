@@ -13,12 +13,19 @@
         return encodeURIComponent((name || '').trim());
     }
 
+    function replaceAll(text, token, value) {
+        return String(text || '').split(token).join(value || '');
+    }
+
     function replacePlaceholders(text, data) {
-        return String(text || '')
-            .replaceAll('{name}', data.name)
-            .replaceAll('{phone}', data.phone)
-            .replaceAll('{encoded_name}', data.encodedName)
-            .replaceAll('{invitation_url}', data.invitationUrl);
+        var output = String(text || '');
+
+        output = replaceAll(output, '{name}', data.name);
+        output = replaceAll(output, '{phone}', data.phone);
+        output = replaceAll(output, '{encoded_name}', data.encodedName);
+        output = replaceAll(output, '{invitation_url}', data.invitationUrl);
+
+        return output;
     }
 
     function makeUrlFromBase(baseUrl, param, encodedName) {
@@ -120,12 +127,11 @@
         var result = wrapper.querySelector('.brilli-wim__result');
         var urlId = wrapper.querySelector('.brilli-wim__url--id');
         var urlEn = wrapper.querySelector('.brilli-wim__url--en');
-        var messageId = wrapper.querySelector('.brilli-wim__message--id');
-        var messageEn = wrapper.querySelector('.brilli-wim__message--en');
-        var copyId = wrapper.querySelector('.brilli-wim__copy--id');
-        var copyEn = wrapper.querySelector('.brilli-wim__copy--en');
-        var whatsappId = wrapper.querySelector('.brilli-wim__whatsapp--id');
-        var whatsappEn = wrapper.querySelector('.brilli-wim__whatsapp--en');
+        var tabs = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__tab'));
+        var panels = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__panel'));
+        var messageFields = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__message'));
+        var copyButtons = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__copy'));
+        var whatsappLinks = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__whatsapp'));
         var notice = wrapper.querySelector('.brilli-wim__notice');
 
         function setNotice(text) {
@@ -134,14 +140,44 @@
             }
         }
 
+        function findMessage(templateKey, language) {
+            return wrapper.querySelector(
+                '.brilli-wim__message[data-template="' + templateKey + '"][data-language="' + language + '"]'
+            );
+        }
+
+        function getMessageTemplate(templateKey, language) {
+            if (!settings.messages || !settings.messages[templateKey]) {
+                return '';
+            }
+
+            return settings.messages[templateKey][language] || '';
+        }
+
+        function activateTab(tab, moveFocus) {
+            var templateKey = tab.getAttribute('data-template');
+
+            tabs.forEach(function (candidate) {
+                var isActive = candidate === tab;
+
+                candidate.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                candidate.setAttribute('tabindex', isActive ? '0' : '-1');
+            });
+
+            panels.forEach(function (panel) {
+                panel.hidden = panel.getAttribute('data-template') !== templateKey;
+            });
+
+            if (moveFocus) {
+                tab.focus();
+            }
+        }
+
         function generate() {
             var name = nameInput.value.trim();
             var phone = phoneInput.value.trim();
-            var invitationUrlId;
-            var invitationUrlEn;
+            var invitationUrls;
             var encodedName;
-            var generatedMessageId;
-            var generatedMessageEn;
 
             if (!name) {
                 setNotice('Nama wajib diisi.');
@@ -150,44 +186,67 @@
             }
 
             encodedName = encodeGuestName(name);
-            invitationUrlId = buildInvitationUrl(settings, name, phone, 'id');
-            invitationUrlEn = buildInvitationUrl(settings, name, phone, 'en');
+            invitationUrls = {
+                id: buildInvitationUrl(settings, name, phone, 'id'),
+                en: buildInvitationUrl(settings, name, phone, 'en')
+            };
 
-            generatedMessageId = replacePlaceholders(settings.messageId, {
-                name: name,
-                phone: phone,
-                encodedName: encodedName,
-                invitationUrl: invitationUrlId
+            urlId.value = invitationUrls.id;
+            urlEn.value = invitationUrls.en;
+
+            messageFields.forEach(function (textarea) {
+                var templateKey = textarea.getAttribute('data-template');
+                var language = textarea.getAttribute('data-language');
+
+                textarea.value = replacePlaceholders(getMessageTemplate(templateKey, language), {
+                    name: name,
+                    phone: phone,
+                    encodedName: encodedName,
+                    invitationUrl: invitationUrls[language]
+                });
             });
 
-            generatedMessageEn = replacePlaceholders(settings.messageEn, {
-                name: name,
-                phone: phone,
-                encodedName: encodedName,
-                invitationUrl: invitationUrlEn
+            whatsappLinks.forEach(function (link) {
+                var templateKey = link.getAttribute('data-template');
+                var language = link.getAttribute('data-language');
+                var textarea = findMessage(templateKey, language);
+
+                link.href = buildWhatsAppUrl(phone, textarea ? textarea.value : '');
             });
-
-            urlId.value = invitationUrlId;
-            urlEn.value = invitationUrlEn;
-            messageId.value = generatedMessageId;
-            messageEn.value = generatedMessageEn;
-
-            if (whatsappId) {
-                whatsappId.href = buildWhatsAppUrl(phone, generatedMessageId);
-            }
-
-            if (whatsappEn) {
-                whatsappEn.href = buildWhatsAppUrl(phone, generatedMessageEn);
-            }
 
             result.hidden = false;
-            setNotice('Undangan berhasil digenerate.');
+            setNotice('Tiga versi undangan berhasil dibuat.');
             return true;
         }
 
-        if (!nameInput || !phoneInput || !generateButton || !result || !urlId || !urlEn || !messageId || !messageEn) {
+        if (!nameInput || !phoneInput || !generateButton || !result || !urlId || !urlEn || !tabs.length || !messageFields.length) {
             return;
         }
+
+        tabs.forEach(function (tab, index) {
+            tab.addEventListener('click', function () {
+                activateTab(tab, false);
+            });
+
+            tab.addEventListener('keydown', function (event) {
+                var targetIndex = index;
+
+                if (event.key === 'ArrowRight') {
+                    targetIndex = (index + 1) % tabs.length;
+                } else if (event.key === 'ArrowLeft') {
+                    targetIndex = (index - 1 + tabs.length) % tabs.length;
+                } else if (event.key === 'Home') {
+                    targetIndex = 0;
+                } else if (event.key === 'End') {
+                    targetIndex = tabs.length - 1;
+                } else {
+                    return;
+                }
+
+                event.preventDefault();
+                activateTab(tabs[targetIndex], true);
+            });
+        });
 
         generateButton.addEventListener('click', generate);
 
@@ -200,26 +259,48 @@
             });
         });
 
-        if (copyId) {
-            copyId.addEventListener('click', function () {
-                if (!messageId.value && !generate()) {
-                    return;
-                }
-                copyValue(messageId, setNotice, 'Kalimat Indonesia berhasil dicopy.');
-            });
-        }
+        copyButtons.forEach(function (button) {
+            button.addEventListener('click', function () {
+                var templateKey = button.getAttribute('data-template');
+                var language = button.getAttribute('data-language');
+                var textarea = findMessage(templateKey, language);
 
-        if (copyEn) {
-            copyEn.addEventListener('click', function () {
-                if (!messageEn.value && !generate()) {
+                if (!textarea) {
                     return;
                 }
-                copyValue(messageEn, setNotice, 'English message copied.');
+
+                if (!textarea.value && !generate()) {
+                    return;
+                }
+
+                copyValue(
+                    textarea,
+                    setNotice,
+                    language === 'en' ? 'English message copied.' : 'Kalimat Indonesia berhasil disalin.'
+                );
             });
-        }
+        });
+
+        whatsappLinks.forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                var templateKey = link.getAttribute('data-template');
+                var language = link.getAttribute('data-language');
+                var textarea = findMessage(templateKey, language);
+
+                if ((!textarea || !textarea.value) && !generate()) {
+                    event.preventDefault();
+                }
+            });
+        });
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.brilli-wim').forEach(init);
-    });
+    function initAll() {
+        Array.prototype.forEach.call(document.querySelectorAll('.brilli-wim'), init);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAll);
+    } else {
+        initAll();
+    }
 }());

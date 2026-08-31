@@ -91,10 +91,64 @@
     border-top: 1px solid rgba(0, 0, 0, .1);
 }
 
+.brilli-wim [hidden] {
+    display: none !important;
+}
+
 .brilli-wim__grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
+}
+
+.brilli-wim__tabs {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+    padding: 5px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, .055);
+}
+
+.brilli-wim__tab {
+    flex: 1 1 0;
+    min-width: 0;
+    border: 0;
+    border-radius: 8px;
+    padding: 11px 14px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #555555;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color .2s ease, color .2s ease, box-shadow .2s ease;
+}
+
+.brilli-wim__tab[aria-selected="true"] {
+    color: #222222;
+    background: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .09);
+}
+
+.brilli-wim__tab:focus-visible,
+.brilli-wim__generate:focus-visible,
+.brilli-wim__copy:focus-visible,
+.brilli-wim__whatsapp:focus-visible {
+    outline: 3px solid rgba(34, 34, 34, .28);
+    outline-offset: 2px;
+}
+
+.brilli-wim__panel {
+    padding-top: 6px;
+}
+
+.brilli-wim__panel-title {
+    margin: 18px 0 0;
+    font-size: 20px;
+    line-height: 1.3;
+    color: #222222;
 }
 
 .brilli-wim__block {
@@ -137,6 +191,16 @@
 
     .brilli-wim__block {
         padding: 14px;
+    }
+
+    .brilli-wim__tabs {
+        gap: 4px;
+        padding: 4px;
+    }
+
+    .brilli-wim__tab {
+        padding: 10px 7px;
+        font-size: 13px;
     }
 
     .brilli-wim__generate,
