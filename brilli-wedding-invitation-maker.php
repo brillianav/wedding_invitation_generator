@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.2.1
+ * Version: 1.2.2
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.2.1';
+        const VERSION = '1.2.2';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
@@ -194,15 +194,15 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             $logo_url = plugin_dir_url(__FILE__) . 'assets/logo-bav-white.png';
             $template_sections = array(
                 'formal' => array(
-                    'label' => 'formal',
+                    'label' => 'Formal',
                     'description' => 'Untuk keluarga, kolega, dan relasi yang membutuhkan bahasa resmi.',
                 ),
                 'casual' => array(
-                    'label' => 'non-formal 1',
+                    'label' => 'Nonformal 1',
                     'description' => 'Untuk teman dan kenalan dengan bahasa yang lebih santai.',
                 ),
                 'warm' => array(
-                    'label' => 'non-formal 2',
+                    'label' => 'Nonformal 2',
                     'description' => 'Untuk sahabat dan orang terdekat dengan bahasa yang hangat.',
                 ),
             );
@@ -420,9 +420,9 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
 
             $wrapper_id = 'brilli-wim-' . wp_generate_uuid4();
             $templates = array(
-                'formal' => 'formal',
-                'casual' => 'non-formal 1',
-                'warm' => 'non-formal 2',
+                'formal' => 'Formal',
+                'casual' => 'Nonformal 1',
+                'warm' => 'Nonformal 2',
             );
 
             ob_start();
