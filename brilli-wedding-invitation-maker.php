@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.1.0
+ * Version: 1.1.1
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.1.0';
+        const VERSION = '1.1.1';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
@@ -211,11 +211,11 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </tr>
 
                         <tr>
-                            <th colspan="2"><h2>Tab 1 — Formal</h2></th>
+                            <th colspan="2"><h2>Tab 1 — formal</h2></th>
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_formal_id">Template Formal Indonesia</label></th>
+                            <th scope="row"><label for="brilli_wim_message_formal_id">Template formal Indonesia</label></th>
                             <td>
                                 <textarea id="brilli_wim_message_formal_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_formal_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_formal_id']); ?></textarea>
                                 <p class="description">Cocok untuk tamu keluarga, kolega, atau relasi. Placeholder: <code>{name}</code>, <code>{phone}</code>, <code>{invitation_url}</code>, <code>{encoded_name}</code>.</p>
@@ -223,18 +223,18 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_formal_en">Formal English Template</label></th>
+                            <th scope="row"><label for="brilli_wim_message_formal_en">Template formal English</label></th>
                             <td>
                                 <textarea id="brilli_wim_message_formal_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_formal_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_formal_en']); ?></textarea>
                             </td>
                         </tr>
 
                         <tr>
-                            <th colspan="2"><h2>Tab 2 — Santai</h2></th>
+                            <th colspan="2"><h2>Tab 2 — non-formal 1</h2></th>
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_casual_id">Template Santai Indonesia</label></th>
+                            <th scope="row"><label for="brilli_wim_message_casual_id">Template non-formal 1 Indonesia</label></th>
                             <td>
                                 <textarea id="brilli_wim_message_casual_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_casual_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_casual_id']); ?></textarea>
                                 <p class="description">Nada ringan untuk teman dan kenalan. Placeholder sama seperti template Formal.</p>
@@ -242,18 +242,18 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_casual_en">Casual English Template</label></th>
+                            <th scope="row"><label for="brilli_wim_message_casual_en">Template non-formal 1 English</label></th>
                             <td>
                                 <textarea id="brilli_wim_message_casual_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_casual_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_casual_en']); ?></textarea>
                             </td>
                         </tr>
 
                         <tr>
-                            <th colspan="2"><h2>Tab 3 — Akrab</h2></th>
+                            <th colspan="2"><h2>Tab 3 — non-formal 2</h2></th>
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_warm_id">Template Akrab Indonesia</label></th>
+                            <th scope="row"><label for="brilli_wim_message_warm_id">Template non-formal 2 Indonesia</label></th>
                             <td>
                                 <textarea id="brilli_wim_message_warm_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_warm_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_warm_id']); ?></textarea>
                                 <p class="description">Nada paling hangat untuk sahabat dan orang terdekat. Placeholder sama seperti template Formal.</p>
@@ -261,7 +261,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </tr>
 
                         <tr>
-                            <th scope="row"><label for="brilli_wim_message_warm_en">Warm English Template</label></th>
+                            <th scope="row"><label for="brilli_wim_message_warm_en">Template non-formal 2 English</label></th>
                             <td>
                                 <textarea id="brilli_wim_message_warm_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_warm_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_warm_en']); ?></textarea>
                             </td>
@@ -324,9 +324,9 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
 
             $wrapper_id = 'brilli-wim-' . wp_generate_uuid4();
             $templates = array(
-                'formal' => 'Formal',
-                'casual' => 'Santai',
-                'warm' => 'Akrab',
+                'formal' => 'formal',
+                'casual' => 'non-formal 1',
+                'warm' => 'non-formal 2',
             );
 
             ob_start();
