@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.1.1
+ * Version: 1.2.0
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,15 +16,19 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.1.1';
+        const VERSION = '1.2.0';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
 
+        private $admin_page_hook = '';
+
         public function __construct() {
             add_action('admin_menu', array($this, 'add_admin_menu'));
             add_action('admin_init', array($this, 'register_settings'));
+            add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
             add_action('wp_enqueue_scripts', array($this, 'register_assets'));
+            add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_plugin_action_links'));
             add_shortcode(self::SHORTCODE, array($this, 'render_shortcode'));
             add_shortcode('brilli_wedding_invitation', array($this, 'render_shortcode'));
         }
@@ -82,13 +86,40 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
         }
 
         public function add_admin_menu() {
-            add_options_page(
+            $this->admin_page_hook = add_menu_page(
                 'Wedding Invitation Maker - BRILLI',
-                'Wedding Invitation Maker',
+                'Wedding Invitation',
                 'manage_options',
                 self::MENU_SLUG,
-                array($this, 'render_admin_page')
+                array($this, 'render_admin_page'),
+                plugin_dir_url(__FILE__) . 'assets/logo-bav-white.png',
+                58
             );
+        }
+
+        public function enqueue_admin_assets($hook_suffix) {
+            if ($this->admin_page_hook !== $hook_suffix) {
+                return;
+            }
+
+            wp_enqueue_style(
+                'brilli-wedding-invitation-maker-admin',
+                plugin_dir_url(__FILE__) . 'assets/brilli-wedding-invitation-maker-admin.css',
+                array(),
+                self::VERSION
+            );
+        }
+
+        public function add_plugin_action_links($links) {
+            $settings_link = sprintf(
+                '<a href="%s">%s</a>',
+                esc_url(admin_url('admin.php?page=' . self::MENU_SLUG)),
+                esc_html__('Buka pengaturan', 'brilli-wedding-invitation-maker')
+            );
+
+            array_unshift($links, $settings_link);
+
+            return $links;
         }
 
         public function register_settings() {
@@ -160,136 +191,201 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             }
 
             $options = $this->get_options();
+            $logo_url = plugin_dir_url(__FILE__) . 'assets/logo-bav-white.png';
+            $template_sections = array(
+                'formal' => array(
+                    'label' => 'formal',
+                    'description' => 'Untuk keluarga, kolega, dan relasi yang membutuhkan bahasa resmi.',
+                ),
+                'casual' => array(
+                    'label' => 'non-formal 1',
+                    'description' => 'Untuk teman dan kenalan dengan bahasa yang lebih santai.',
+                ),
+                'warm' => array(
+                    'label' => 'non-formal 2',
+                    'description' => 'Untuk sahabat dan orang terdekat dengan bahasa yang hangat.',
+                ),
+            );
+            $button_fields = array(
+                'generate_button' => array('Tombol generate', 'Tindakan utama untuk membuat semua versi pesan.'),
+                'copy_id_button' => array('Salin Indonesia', 'Menyalin pesan berbahasa Indonesia.'),
+                'copy_en_button' => array('Salin English', 'Menyalin pesan berbahasa Inggris.'),
+                'whatsapp_id_button' => array('WhatsApp Indonesia', 'Membuka WhatsApp dengan pesan Indonesia.'),
+                'whatsapp_en_button' => array('WhatsApp English', 'Membuka WhatsApp dengan pesan Inggris.'),
+            );
             ?>
             <div class="wrap brilli-wim-admin">
-                <h1>Wedding Invitation Maker - BRILLI</h1>
-                <p><strong>New plugin slug:</strong> <code>brilli-wedding-invitation-maker</code></p>
-                <p>Gunakan setting ini untuk generate kalimat undangan Indonesia dan English, lengkap dengan URL berbeda dan tombol WhatsApp masing-masing.</p>
+                <?php settings_errors(); ?>
 
-                <form method="post" action="options.php">
-                    <?php settings_fields('brilli_wedding_invitation_maker_group'); ?>
+                <header class="brilli-wim-admin__hero">
+                    <div class="brilli-wim-admin__brand">
+                        <img src="<?php echo esc_url($logo_url); ?>" width="84" height="84" alt="BRILLI">
+                        <div>
+                            <span class="brilli-wim-admin__eyebrow">BRILLI tools</span>
+                            <h1>Wedding Invitation Maker</h1>
+                            <p>Kelola tautan dan enam template pesan undangan dari satu tempat.</p>
+                        </div>
+                    </div>
+                    <div class="brilli-wim-admin__hero-actions">
+                        <span class="brilli-wim-admin__version">Versi <?php echo esc_html(self::VERSION); ?></span>
+                        <a class="brilli-wim-admin__hero-link" href="#brilli-wim-usage">Lihat cara pakai</a>
+                    </div>
+                </header>
 
-                    <table class="form-table" role="presentation">
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_base_url_id">URL Undangan Indonesia</label></th>
-                            <td>
-                                <input type="url" id="brilli_wim_base_url_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[base_url_id]" value="<?php echo esc_attr($options['base_url_id']); ?>" class="regular-text" placeholder="https://brillian.my.id/">
-                                <p class="description">Contoh hasil: <code>https://brillian.my.id/?to=Christopher%20Emmanuel%20Theodore%20Winchester</code></p>
-                            </td>
-                        </tr>
+                <div class="brilli-wim-admin__shell">
+                    <aside class="brilli-wim-admin__sidebar">
+                        <nav class="brilli-wim-admin__nav" aria-label="Navigasi pengaturan">
+                            <a href="#brilli-wim-links"><span>01</span><strong>Tautan undangan</strong></a>
+                            <a href="#brilli-wim-messages"><span>02</span><strong>Template pesan</strong></a>
+                            <a href="#brilli-wim-buttons"><span>03</span><strong>Label tombol</strong></a>
+                            <a href="#brilli-wim-usage"><span>04</span><strong>Cara pakai</strong></a>
+                        </nav>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_base_url_en">URL Undangan English</label></th>
-                            <td>
-                                <input type="url" id="brilli_wim_base_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[base_url_en]" value="<?php echo esc_attr($options['base_url_en']); ?>" class="regular-text" placeholder="https://brillian.my.id/en/">
-                                <p class="description">Contoh hasil: <code>https://brillian.my.id/en/?to=Christopher%20Emmanuel%20Theodore%20Winchester</code></p>
-                            </td>
-                        </tr>
+                        <div class="brilli-wim-admin__quick-card">
+                            <span>Shortcode utama</span>
+                            <code>[<?php echo esc_html(self::SHORTCODE); ?>]</code>
+                            <p>Tempel di Elementor, Gutenberg, atau widget shortcode.</p>
+                        </div>
+                    </aside>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_url_param">Parameter Nama</label></th>
-                            <td>
-                                <input type="text" id="brilli_wim_url_param" name="<?php echo esc_attr(self::OPTION_KEY); ?>[url_param]" value="<?php echo esc_attr($options['url_param']); ?>" class="regular-text" placeholder="to">
-                                <p class="description">Default: <code>to</code>. Dipakai untuk URL Indonesia dan English.</p>
-                            </td>
-                        </tr>
+                    <main class="brilli-wim-admin__content">
+                        <form method="post" action="options.php">
+                            <?php settings_fields('brilli_wedding_invitation_maker_group'); ?>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_custom_url_id">Custom URL Template Indonesia</label></th>
-                            <td>
-                                <input type="text" id="brilli_wim_custom_url_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[custom_url_id]" value="<?php echo esc_attr($options['custom_url_id']); ?>" class="large-text" placeholder="https://brillian.my.id/?to={encoded_name}">
-                                <p class="description">Opsional. Kalau diisi, ini akan menimpa URL Indonesia biasa. Placeholder: <code>{name}</code>, <code>{encoded_name}</code>, <code>{phone}</code>.</p>
-                            </td>
-                        </tr>
+                            <section id="brilli-wim-links" class="brilli-wim-admin__card">
+                                <div class="brilli-wim-admin__card-heading">
+                                    <span>Langkah 1</span>
+                                    <h2>Tautan undangan</h2>
+                                    <p>Tentukan halaman undangan untuk setiap bahasa. Nama tamu ditambahkan otomatis ke URL.</p>
+                                </div>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_custom_url_en">Custom URL Template English</label></th>
-                            <td>
-                                <input type="text" id="brilli_wim_custom_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[custom_url_en]" value="<?php echo esc_attr($options['custom_url_en']); ?>" class="large-text" placeholder="https://brillian.my.id/en/?to={encoded_name}">
-                                <p class="description">Opsional. Kalau diisi, ini akan menimpa URL English biasa. Placeholder: <code>{name}</code>, <code>{encoded_name}</code>, <code>{phone}</code>.</p>
-                            </td>
-                        </tr>
+                                <div class="brilli-wim-admin__field-grid">
+                                    <div class="brilli-wim-admin__field">
+                                        <label for="brilli_wim_base_url_id">URL Indonesia</label>
+                                        <input type="url" id="brilli_wim_base_url_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[base_url_id]" value="<?php echo esc_attr($options['base_url_id']); ?>" placeholder="https://brillian.my.id/">
+                                        <p>Halaman utama untuk tamu berbahasa Indonesia.</p>
+                                    </div>
 
-                        <tr>
-                            <th colspan="2"><h2>Tab 1 — formal</h2></th>
-                        </tr>
+                                    <div class="brilli-wim-admin__field">
+                                        <label for="brilli_wim_base_url_en">URL English</label>
+                                        <input type="url" id="brilli_wim_base_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[base_url_en]" value="<?php echo esc_attr($options['base_url_en']); ?>" placeholder="https://brillian.my.id/en/">
+                                        <p>Halaman utama untuk tamu berbahasa Inggris.</p>
+                                    </div>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_message_formal_id">Template formal Indonesia</label></th>
-                            <td>
-                                <textarea id="brilli_wim_message_formal_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_formal_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_formal_id']); ?></textarea>
-                                <p class="description">Cocok untuk tamu keluarga, kolega, atau relasi. Placeholder: <code>{name}</code>, <code>{phone}</code>, <code>{invitation_url}</code>, <code>{encoded_name}</code>.</p>
-                            </td>
-                        </tr>
+                                    <div class="brilli-wim-admin__field brilli-wim-admin__field--compact">
+                                        <label for="brilli_wim_url_param">Parameter nama</label>
+                                        <input type="text" id="brilli_wim_url_param" name="<?php echo esc_attr(self::OPTION_KEY); ?>[url_param]" value="<?php echo esc_attr($options['url_param']); ?>" placeholder="to">
+                                        <p>Gunakan <code>to</code> jika situs undangan memakai format <code>?to=Nama</code>.</p>
+                                    </div>
+                                </div>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_message_formal_en">Template formal English</label></th>
-                            <td>
-                                <textarea id="brilli_wim_message_formal_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_formal_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_formal_en']); ?></textarea>
-                            </td>
-                        </tr>
+                                <details class="brilli-wim-admin__advanced">
+                                    <summary>Atur template URL khusus <span>Opsional</span></summary>
+                                    <div class="brilli-wim-admin__advanced-content">
+                                        <p>Isi bagian ini hanya jika struktur URL Anda berbeda. Template khusus akan menggantikan URL utama di atas.</p>
+                                        <div class="brilli-wim-admin__field-grid">
+                                            <div class="brilli-wim-admin__field">
+                                                <label for="brilli_wim_custom_url_id">Template URL Indonesia</label>
+                                                <input type="text" id="brilli_wim_custom_url_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[custom_url_id]" value="<?php echo esc_attr($options['custom_url_id']); ?>" placeholder="https://brillian.my.id/?to={encoded_name}">
+                                            </div>
+                                            <div class="brilli-wim-admin__field">
+                                                <label for="brilli_wim_custom_url_en">Template URL English</label>
+                                                <input type="text" id="brilli_wim_custom_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[custom_url_en]" value="<?php echo esc_attr($options['custom_url_en']); ?>" placeholder="https://brillian.my.id/en/?to={encoded_name}">
+                                            </div>
+                                        </div>
+                                        <p class="brilli-wim-admin__helper">Placeholder URL: <code>{name}</code> <code>{encoded_name}</code> <code>{phone}</code></p>
+                                    </div>
+                                </details>
+                            </section>
 
-                        <tr>
-                            <th colspan="2"><h2>Tab 2 — non-formal 1</h2></th>
-                        </tr>
+                            <section id="brilli-wim-messages" class="brilli-wim-admin__card">
+                                <div class="brilli-wim-admin__card-heading">
+                                    <span>Langkah 2</span>
+                                    <h2>Template pesan</h2>
+                                    <p>Sesuaikan gaya pesan untuk setiap tamu dalam bahasa Indonesia dan Inggris.</p>
+                                </div>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_message_casual_id">Template non-formal 1 Indonesia</label></th>
-                            <td>
-                                <textarea id="brilli_wim_message_casual_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_casual_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_casual_id']); ?></textarea>
-                                <p class="description">Nada ringan untuk teman dan kenalan. Placeholder sama seperti template Formal.</p>
-                            </td>
-                        </tr>
+                                <div class="brilli-wim-admin__tokens" aria-label="Placeholder yang tersedia">
+                                    <span>Placeholder:</span>
+                                    <code>{name}</code>
+                                    <code>{phone}</code>
+                                    <code>{invitation_url}</code>
+                                    <code>{encoded_name}</code>
+                                </div>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_message_casual_en">Template non-formal 1 English</label></th>
-                            <td>
-                                <textarea id="brilli_wim_message_casual_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_casual_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_casual_en']); ?></textarea>
-                            </td>
-                        </tr>
+                                <?php foreach ($template_sections as $template_key => $template) : ?>
+                                    <div class="brilli-wim-admin__template">
+                                        <div class="brilli-wim-admin__template-heading">
+                                            <span><?php echo esc_html($template['label']); ?></span>
+                                            <p><?php echo esc_html($template['description']); ?></p>
+                                        </div>
+                                        <div class="brilli-wim-admin__template-grid">
+                                            <?php foreach (array('id' => 'Indonesia', 'en' => 'English') as $language_key => $language_label) : ?>
+                                                <?php
+                                                $option_key = 'message_' . $template_key . '_' . $language_key;
+                                                $field_id = 'brilli_wim_' . $option_key;
+                                                ?>
+                                                <div class="brilli-wim-admin__field">
+                                                    <label for="<?php echo esc_attr($field_id); ?>"><?php echo esc_html($language_label); ?></label>
+                                                    <textarea id="<?php echo esc_attr($field_id); ?>" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_key); ?>]" rows="12"><?php echo esc_textarea($options[$option_key]); ?></textarea>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </section>
 
-                        <tr>
-                            <th colspan="2"><h2>Tab 3 — non-formal 2</h2></th>
-                        </tr>
+                            <section id="brilli-wim-buttons" class="brilli-wim-admin__card">
+                                <div class="brilli-wim-admin__card-heading">
+                                    <span>Langkah 3</span>
+                                    <h2>Label tombol</h2>
+                                    <p>Gunakan label singkat agar setiap tindakan mudah dipahami tamu.</p>
+                                </div>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_message_warm_id">Template non-formal 2 Indonesia</label></th>
-                            <td>
-                                <textarea id="brilli_wim_message_warm_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_warm_id]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_warm_id']); ?></textarea>
-                                <p class="description">Nada paling hangat untuk sahabat dan orang terdekat. Placeholder sama seperti template Formal.</p>
-                            </td>
-                        </tr>
+                                <div class="brilli-wim-admin__button-grid">
+                                    <?php foreach ($button_fields as $option_key => $button_field) : ?>
+                                        <div class="brilli-wim-admin__field">
+                                            <label for="brilli_wim_<?php echo esc_attr($option_key); ?>"><?php echo esc_html($button_field[0]); ?></label>
+                                            <input type="text" id="brilli_wim_<?php echo esc_attr($option_key); ?>" name="<?php echo esc_attr(self::OPTION_KEY); ?>[<?php echo esc_attr($option_key); ?>]" value="<?php echo esc_attr($options[$option_key]); ?>">
+                                            <p><?php echo esc_html($button_field[1]); ?></p>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </section>
 
-                        <tr>
-                            <th scope="row"><label for="brilli_wim_message_warm_en">Template non-formal 2 English</label></th>
-                            <td>
-                                <textarea id="brilli_wim_message_warm_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[message_warm_en]" rows="14" class="large-text code"><?php echo esc_textarea($options['message_warm_en']); ?></textarea>
-                            </td>
-                        </tr>
+                            <div class="brilli-wim-admin__savebar">
+                                <div>
+                                    <strong>Simpan pengaturan</strong>
+                                    <span>Perubahan langsung digunakan oleh shortcode.</span>
+                                </div>
+                                <?php submit_button('Simpan perubahan', 'primary large', 'submit', false); ?>
+                            </div>
+                        </form>
 
-                        <tr>
-                            <th scope="row">Label Tombol</th>
-                            <td>
-                                <p><label>Generate<br><input type="text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[generate_button]" value="<?php echo esc_attr($options['generate_button']); ?>" class="regular-text"></label></p>
-                                <p><label>Copy Indonesia<br><input type="text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[copy_id_button]" value="<?php echo esc_attr($options['copy_id_button']); ?>" class="regular-text"></label></p>
-                                <p><label>Copy English<br><input type="text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[copy_en_button]" value="<?php echo esc_attr($options['copy_en_button']); ?>" class="regular-text"></label></p>
-                                <p><label>WhatsApp Indonesia<br><input type="text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[whatsapp_id_button]" value="<?php echo esc_attr($options['whatsapp_id_button']); ?>" class="regular-text"></label></p>
-                                <p><label>WhatsApp English<br><input type="text" name="<?php echo esc_attr(self::OPTION_KEY); ?>[whatsapp_en_button]" value="<?php echo esc_attr($options['whatsapp_en_button']); ?>" class="regular-text"></label></p>
-                            </td>
-                        </tr>
-                    </table>
+                        <section id="brilli-wim-usage" class="brilli-wim-admin__card brilli-wim-admin__usage">
+                            <div class="brilli-wim-admin__card-heading">
+                                <span>Langkah 4</span>
+                                <h2>Pasang di halaman</h2>
+                                <p>Tambahkan salah satu shortcode berikut ke halaman tempat generator undangan akan ditampilkan.</p>
+                            </div>
+                            <div class="brilli-wim-admin__shortcodes">
+                                <div>
+                                    <span>Direkomendasikan</span>
+                                    <code>[<?php echo esc_html(self::SHORTCODE); ?>]</code>
+                                </div>
+                                <div>
+                                    <span>Alias singkat</span>
+                                    <code>[brilli_wedding_invitation]</code>
+                                </div>
+                            </div>
+                        </section>
 
-                    <?php submit_button('Simpan Setting'); ?>
-                </form>
-
-                <hr>
-                <h2>Cara Pakai</h2>
-                <p>Tambahkan shortcode ini di Elementor atau Gutenberg:</p>
-                <p><code>[brilli_wedding_invitation_maker]</code></p>
-                <p>Shortcode pendek juga tersedia:</p>
-                <p><code>[brilli_wedding_invitation]</code></p>
-
-                <p class="brilli-wim-credit">Made by <a href="https://brillianav.com" target="_blank" rel="noopener noreferrer">brilli</a></p>
+                        <footer class="brilli-wim-admin__footer">
+                            <span>Wedding Invitation Maker by BRILLI</span>
+                            <a href="https://brillianav.com" target="_blank" rel="noopener noreferrer">brillianav.com</a>
+                        </footer>
+                    </main>
+                </div>
             </div>
             <?php
         }
