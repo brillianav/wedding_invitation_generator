@@ -407,6 +407,7 @@
     margin-top: 22px;
     margin-bottom: 26px;
     padding: 30px;
+    scroll-margin-top: clamp(16px, 5vh, 64px);
     animation: brilli-wim-reveal 520ms var(--brilli-ease) both;
 }
 

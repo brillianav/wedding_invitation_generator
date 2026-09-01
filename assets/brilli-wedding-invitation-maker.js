@@ -190,6 +190,21 @@
             }
         }
 
+        function scrollToResult() {
+            var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            if (typeof result.scrollIntoView !== 'function') {
+                return;
+            }
+
+            window.requestAnimationFrame(function () {
+                result.scrollIntoView({
+                    behavior: prefersReducedMotion ? 'auto' : 'smooth',
+                    block: 'start'
+                });
+            });
+        }
+
         function generate() {
             var name = nameInput.value.trim();
             var phone = phoneInput.value.trim();
@@ -236,6 +251,7 @@
 
             result.hidden = false;
             setNotice('Tiga versi undangan berhasil dibuat dan siap dibagikan.', 'success');
+            scrollToResult();
             return true;
         }
 
