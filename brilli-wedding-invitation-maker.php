@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
 
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.3.0';
+        const VERSION = '1.4.0';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
@@ -424,6 +424,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'casual' => 'Nonformal 1',
                 'warm' => 'Nonformal 2',
             );
+            $hero_image_url = plugin_dir_url(__FILE__) . 'assets/favicon-wedding.png';
 
             ob_start();
             ?>
@@ -434,9 +435,9 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         <h2>Buat pesan undangan yang terasa personal.</h2>
                         <p>Isi data tamu sekali, lalu pilih gaya pesan dan bahasa yang paling sesuai.</p>
                     </div>
-                    <div class="brilli-wim__monogram" aria-hidden="true">
-                        <span>B</span><i>×</i><span>M</span>
-                    </div>
+                    <figure class="brilli-wim__hero-art">
+                        <img src="<?php echo esc_url($hero_image_url); ?>" width="190" height="190" alt="Ilustrasi pixel pasangan pengantin" decoding="async">
+                    </figure>
                 </header>
 
                 <section class="brilli-wim__composer" aria-labelledby="<?php echo esc_attr($wrapper_id); ?>-guest-heading">
