@@ -4,7 +4,7 @@ Tags: wedding invitation, whatsapp, shortcode, invitation generator
 Requires at least: 5.8
 Requires PHP: 5.6
 Tested up to: 6.6
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 License: GPLv2 or later
 
 Generate three styles of Indonesian and English wedding invitation messages with dynamic invitation URLs and WhatsApp send buttons.
@@ -14,6 +14,7 @@ Generate three styles of Indonesian and English wedding invitation messages with
 * Indonesian and English message for every style.
 * All six message templates can be edited from the top-level Wedding Invitation menu.
 * Copy and WhatsApp actions for every generated message.
+* Private, browser-local generation history with an accessible frontend popup.
 * Existing version 1.0 templates are preserved as the Formal template after upgrading.
 
 == Shortcode ==
@@ -33,6 +34,11 @@ Indonesia: https://brillian.my.id/?to={encoded_name}
 English: https://brillian.my.id/en/?to={encoded_name}
 
 == Changelog ==
+
+= 1.6.0 =
+* Added a frontend popup listing generated guest names and timestamps.
+* Stores up to 50 history entries locally in the visitor's browser without saving WhatsApp numbers or sending data to the server.
+* Added a two-step clear-history action, responsive styling, focus restoration, and cross-tab history updates.
 
 = 1.5.0 =
 * Refactored hook registration, asset handles, constants, and option sanitization for easier maintenance.

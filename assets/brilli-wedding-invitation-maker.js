@@ -1,6 +1,62 @@
 (function () {
     'use strict';
 
+    var HISTORY_STORAGE_KEY = 'brilliWimGenerationHistory:v1';
+    var HISTORY_LIMIT = 50;
+    var memoryHistory = [];
+
+    function normalizeHistory(entries) {
+        if (!Array.isArray(entries)) {
+            return [];
+        }
+
+        return entries.filter(function (entry) {
+            return entry && typeof entry.name === 'string' && entry.name.trim() && Number(entry.createdAt) > 0;
+        }).slice(0, HISTORY_LIMIT).map(function (entry) {
+            return {
+                name: entry.name.trim(),
+                createdAt: Number(entry.createdAt)
+            };
+        });
+    }
+
+    function readHistory() {
+        try {
+            var storedHistory = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+
+            if (storedHistory !== null) {
+                memoryHistory = normalizeHistory(JSON.parse(storedHistory));
+            }
+        } catch (error) {
+            // Continue with in-memory history when browser storage is unavailable.
+        }
+
+        return memoryHistory.slice();
+    }
+
+    function writeHistory(entries) {
+        memoryHistory = normalizeHistory(entries);
+
+        try {
+            window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(memoryHistory));
+        } catch (error) {
+            // The current browser session still retains the in-memory copy.
+        }
+
+        document.dispatchEvent(new Event('brilli-wim-history-changed'));
+    }
+
+    function addHistoryEntry(name) {
+        var entries = readHistory();
+
+        entries.unshift({
+            name: String(name || '').trim(),
+            createdAt: Date.now()
+        });
+
+        writeHistory(entries);
+    }
+
     function getSettings(wrapper) {
         try {
             return JSON.parse(wrapper.getAttribute('data-settings') || '{}');
@@ -171,6 +227,16 @@
         var copyButtons = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__copy'));
         var whatsappLinks = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__whatsapp'));
         var notice = wrapper.querySelector('.brilli-wim__notice');
+        var historyTrigger = wrapper.querySelector('.brilli-wim__history-trigger');
+        var historyCount = wrapper.querySelector('.brilli-wim__history-count');
+        var historyDialog = wrapper.querySelector('.brilli-wim__history-dialog');
+        var historyClose = wrapper.querySelector('.brilli-wim__history-close');
+        var historyList = wrapper.querySelector('.brilli-wim__history-list');
+        var historyEmpty = wrapper.querySelector('.brilli-wim__history-empty');
+        var historySummaryCount = wrapper.querySelector('.brilli-wim__history-summary-count');
+        var historyClear = wrapper.querySelector('.brilli-wim__history-clear');
+        var historyClearTimer = null;
+        var historyClearArmed = false;
 
         if (wrapper.getAttribute('data-brilli-wim-initialized') === 'true') {
             return;
@@ -249,6 +315,127 @@
             });
         }
 
+        function formatHistoryTime(timestamp) {
+            var date = new Date(timestamp);
+
+            if (isNaN(date.getTime())) {
+                return '';
+            }
+
+            try {
+                return new Intl.DateTimeFormat('id-ID', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }).format(date);
+            } catch (error) {
+                return date.toLocaleString();
+            }
+        }
+
+        function resetHistoryClear() {
+            historyClearArmed = false;
+
+            if (historyClearTimer) {
+                window.clearTimeout(historyClearTimer);
+                historyClearTimer = null;
+            }
+
+            if (historyClear) {
+                historyClear.textContent = getString('historyClear', 'Hapus semua riwayat');
+            }
+        }
+
+        function renderHistory() {
+            var entries = readHistory();
+
+            if (historyCount) {
+                historyCount.textContent = String(entries.length);
+            }
+
+            if (historySummaryCount) {
+                historySummaryCount.textContent = String(entries.length);
+            }
+
+            if (historyList) {
+                historyList.textContent = '';
+
+                entries.forEach(function (entry, index) {
+                    var item = document.createElement('li');
+                    var number = document.createElement('span');
+                    var details = document.createElement('div');
+                    var guestName = document.createElement('strong');
+                    var generatedAt = document.createElement('time');
+                    var formattedTime = formatHistoryTime(entry.createdAt);
+
+                    number.className = 'brilli-wim__history-number';
+                    number.textContent = index < 9 ? '0' + String(index + 1) : String(index + 1);
+                    details.className = 'brilli-wim__history-details';
+                    guestName.textContent = entry.name;
+                    generatedAt.dateTime = new Date(entry.createdAt).toISOString();
+                    generatedAt.textContent = getString('historyGeneratedAt', 'Dibuat pada') + ' ' + formattedTime;
+
+                    details.appendChild(guestName);
+                    details.appendChild(generatedAt);
+                    item.appendChild(number);
+                    item.appendChild(details);
+                    historyList.appendChild(item);
+                });
+
+                historyList.hidden = entries.length === 0;
+            }
+
+            if (historyEmpty) {
+                historyEmpty.hidden = entries.length > 0;
+            }
+
+            if (historyClear) {
+                historyClear.disabled = entries.length === 0;
+            }
+
+            if (!entries.length) {
+                resetHistoryClear();
+            }
+        }
+
+        function openHistory() {
+            if (!historyDialog) {
+                return;
+            }
+
+            renderHistory();
+
+            if (typeof historyDialog.showModal === 'function') {
+                historyDialog.showModal();
+            } else {
+                historyDialog.setAttribute('open', '');
+            }
+
+            if (historyClose) {
+                historyClose.focus();
+            }
+        }
+
+        function closeHistory() {
+            if (!historyDialog) {
+                return;
+            }
+
+            resetHistoryClear();
+
+            if (typeof historyDialog.close === 'function') {
+                historyDialog.close();
+            } else {
+                historyDialog.removeAttribute('open');
+
+                if (historyTrigger) {
+                    historyTrigger.focus();
+                }
+            }
+        }
+
         function generate() {
             var name = nameInput.value.trim();
             var phone = phoneInput.value.trim();
@@ -293,6 +480,7 @@
                 link.href = buildWhatsAppUrl(phone, textarea ? textarea.value : '');
             });
 
+            addHistoryEntry(name);
             result.hidden = false;
             setNotice(getString('generated', 'Tiga versi undangan berhasil dibuat dan siap dibagikan.'), 'success');
             scrollToResult();
@@ -325,6 +513,54 @@
         });
 
         generateButton.addEventListener('click', generate);
+
+        if (historyTrigger) {
+            historyTrigger.addEventListener('click', openHistory);
+        }
+
+        if (historyClose) {
+            historyClose.addEventListener('click', closeHistory);
+        }
+
+        if (historyDialog) {
+            historyDialog.addEventListener('click', function (event) {
+                if (event.target === historyDialog) {
+                    closeHistory();
+                }
+            });
+
+            historyDialog.addEventListener('close', function () {
+                resetHistoryClear();
+
+                if (historyTrigger) {
+                    historyTrigger.focus();
+                }
+            });
+        }
+
+        if (historyClear) {
+            historyClear.addEventListener('click', function () {
+                if (!historyClearArmed) {
+                    historyClearArmed = true;
+                    historyClear.textContent = getString('historyClearConfirm', 'Klik lagi untuk menghapus');
+                    historyClearTimer = window.setTimeout(resetHistoryClear, 2500);
+                    return;
+                }
+
+                writeHistory([]);
+                resetHistoryClear();
+                setNotice(getString('historyCleared', 'Riwayat berhasil dihapus.'), 'success');
+            });
+        }
+
+        document.addEventListener('brilli-wim-history-changed', renderHistory);
+        window.addEventListener('storage', function (event) {
+            if (event.key === HISTORY_STORAGE_KEY) {
+                renderHistory();
+            }
+        });
+
+        renderHistory();
 
         nameInput.addEventListener('input', function () {
             if (nameInput.value.trim()) {

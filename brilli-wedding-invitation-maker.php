@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.5.0
+ * Version: 1.6.0
  * Requires at least: 5.8
  * Requires PHP: 5.6
  * Author: Brillian AV
@@ -31,7 +31,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
      * Main plugin controller.
      */
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.5.0';
+        const VERSION = '1.6.0';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const OPTION_GROUP = 'brilli_wedding_invitation_maker_group';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
@@ -605,6 +605,10 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                     'copyError' => __('Pesan tidak dapat disalin. Silakan salin secara manual.', 'brilli-wedding-invitation-maker'),
                     'copiedId' => __('Tersalin', 'brilli-wedding-invitation-maker'),
                     'copiedEn' => __('Copied', 'brilli-wedding-invitation-maker'),
+                    'historyClear' => __('Hapus semua riwayat', 'brilli-wedding-invitation-maker'),
+                    'historyClearConfirm' => __('Klik lagi untuk menghapus', 'brilli-wedding-invitation-maker'),
+                    'historyCleared' => __('Riwayat berhasil dihapus.', 'brilli-wedding-invitation-maker'),
+                    'historyGeneratedAt' => __('Dibuat pada', 'brilli-wedding-invitation-maker'),
                 ),
             );
 
@@ -656,7 +660,14 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                             <span><?php echo esc_html($options['generate_button']); ?></span>
                             <span aria-hidden="true">→</span>
                         </button>
-                        <p class="brilli-wim__privacy"><?php esc_html_e('Data hanya diproses di browser dan tidak dikirim ke server.', 'brilli-wedding-invitation-maker'); ?></p>
+                        <div class="brilli-wim__local-tools">
+                            <button type="button" class="brilli-wim__history-trigger" aria-haspopup="dialog" aria-controls="<?php echo esc_attr($wrapper_id); ?>-history-dialog">
+                                <span class="brilli-wim__history-icon" aria-hidden="true">↺</span>
+                                <span><?php esc_html_e('Lihat riwayat', 'brilli-wedding-invitation-maker'); ?></span>
+                                <span class="brilli-wim__history-count" aria-label="<?php esc_attr_e('Jumlah riwayat', 'brilli-wedding-invitation-maker'); ?>">0</span>
+                            </button>
+                            <p class="brilli-wim__privacy"><?php esc_html_e('Nama tersimpan sebagai riwayat di browser ini. Nomor WhatsApp tidak disimpan dan data tidak dikirim ke server.', 'brilli-wedding-invitation-maker'); ?></p>
+                        </div>
                     </div>
 
                     <p class="brilli-wim__notice" aria-live="polite" aria-atomic="true"></p>
@@ -774,6 +785,44 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         <?php $panel_index++; ?>
                     <?php endforeach; ?>
                 </section>
+
+                <dialog
+                    id="<?php echo esc_attr($wrapper_id); ?>-history-dialog"
+                    class="brilli-wim__history-dialog"
+                    aria-labelledby="<?php echo esc_attr($wrapper_id); ?>-history-title"
+                    aria-describedby="<?php echo esc_attr($wrapper_id); ?>-history-description"
+                >
+                    <div class="brilli-wim__history-shell">
+                        <header class="brilli-wim__history-header">
+                            <div>
+                                <span class="brilli-wim__history-kicker"><?php esc_html_e('Tersimpan lokal', 'brilli-wedding-invitation-maker'); ?></span>
+                                <h3 id="<?php echo esc_attr($wrapper_id); ?>-history-title"><?php esc_html_e('Riwayat nama tamu', 'brilli-wedding-invitation-maker'); ?></h3>
+                            </div>
+                            <button type="button" class="brilli-wim__history-close" aria-label="<?php esc_attr_e('Tutup riwayat', 'brilli-wedding-invitation-maker'); ?>">×</button>
+                        </header>
+
+                        <div class="brilli-wim__history-body">
+                            <p id="<?php echo esc_attr($wrapper_id); ?>-history-description" class="brilli-wim__history-description"><?php esc_html_e('Daftar nama yang pernah dibuat melalui perangkat dan browser ini, dari yang terbaru.', 'brilli-wedding-invitation-maker'); ?></p>
+
+                            <div class="brilli-wim__history-summary" aria-live="polite">
+                                <span class="brilli-wim__history-summary-count">0</span>
+                                <span><?php esc_html_e('nama tersimpan', 'brilli-wedding-invitation-maker'); ?></span>
+                            </div>
+
+                            <ol class="brilli-wim__history-list"></ol>
+                            <div class="brilli-wim__history-empty">
+                                <span aria-hidden="true">✦</span>
+                                <strong><?php esc_html_e('Belum ada riwayat', 'brilli-wedding-invitation-maker'); ?></strong>
+                                <p><?php esc_html_e('Nama akan muncul di sini setelah undangan berhasil dibuat.', 'brilli-wedding-invitation-maker'); ?></p>
+                            </div>
+                        </div>
+
+                        <footer class="brilli-wim__history-footer">
+                            <p><?php esc_html_e('Hanya nama dan waktu pembuatan yang disimpan. Riwayat ini tidak tersinkron ke server.', 'brilli-wedding-invitation-maker'); ?></p>
+                            <button type="button" class="brilli-wim__history-clear" disabled><?php esc_html_e('Hapus semua riwayat', 'brilli-wedding-invitation-maker'); ?></button>
+                        </footer>
+                    </div>
+                </dialog>
             </div>
             <?php
             return ob_get_clean();
