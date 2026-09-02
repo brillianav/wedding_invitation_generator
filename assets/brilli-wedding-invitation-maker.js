@@ -101,37 +101,64 @@
         return 'https://wa.me/?text=' + text;
     }
 
-    function copyValue(textarea, setNotice, message) {
+    function legacyCopyValue(textarea) {
+        var activeElement = document.activeElement;
+        var copied = false;
+
         textarea.focus();
         textarea.select();
         textarea.setSelectionRange(0, textarea.value.length);
 
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(textarea.value).then(function () {
-                setNotice(message, 'success');
-            }).catch(function () {
-                document.execCommand('copy');
-                setNotice(message, 'success');
-            });
-        } else {
-            document.execCommand('copy');
-            setNotice(message, 'success');
+        try {
+            copied = document.execCommand('copy');
+        } catch (error) {
+            copied = false;
         }
+
+        if (activeElement && typeof activeElement.focus === 'function') {
+            activeElement.focus();
+        }
+
+        return copied;
+    }
+
+    function copyValue(textarea) {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(textarea.value).catch(function () {
+                if (!legacyCopyValue(textarea)) {
+                    return Promise.reject(new Error('Clipboard is unavailable.'));
+                }
+
+                return undefined;
+            });
+        }
+
+        if (legacyCopyValue(textarea)) {
+            return Promise.resolve();
+        }
+
+        return Promise.reject(new Error('Clipboard is unavailable.'));
     }
 
     function flashButtonLabel(button, temporaryLabel) {
         var originalLabel = button.getAttribute('data-original-label') || button.textContent;
 
+        if (button.brilliWimFlashTimer) {
+            window.clearTimeout(button.brilliWimFlashTimer);
+        }
+
         button.setAttribute('data-original-label', originalLabel);
         button.textContent = temporaryLabel;
 
-        window.setTimeout(function () {
+        button.brilliWimFlashTimer = window.setTimeout(function () {
             button.textContent = originalLabel;
+            button.brilliWimFlashTimer = null;
         }, 1600);
     }
 
     function init(wrapper) {
         var settings = getSettings(wrapper);
+        var strings = settings.i18n || {};
         var nameInput = wrapper.querySelector('.brilli-wim__name');
         var phoneInput = wrapper.querySelector('.brilli-wim__phone');
         var generateButton = wrapper.querySelector('.brilli-wim__generate');
@@ -144,6 +171,20 @@
         var copyButtons = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__copy'));
         var whatsappLinks = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__whatsapp'));
         var notice = wrapper.querySelector('.brilli-wim__notice');
+
+        if (wrapper.getAttribute('data-brilli-wim-initialized') === 'true') {
+            return;
+        }
+
+        if (!nameInput || !phoneInput || !generateButton || !result || !urlId || !urlEn || !tabs.length || !messageFields.length) {
+            return;
+        }
+
+        wrapper.setAttribute('data-brilli-wim-initialized', 'true');
+
+        function getString(key, fallback) {
+            return typeof strings[key] === 'string' && strings[key] ? strings[key] : fallback;
+        }
 
         function setNotice(text, state) {
             if (notice) {
@@ -192,12 +233,15 @@
 
         function scrollToResult() {
             var prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            var requestFrame = window.requestAnimationFrame || function (callback) {
+                callback();
+            };
 
             if (typeof result.scrollIntoView !== 'function') {
                 return;
             }
 
-            window.requestAnimationFrame(function () {
+            requestFrame(function () {
                 result.scrollIntoView({
                     behavior: prefersReducedMotion ? 'auto' : 'smooth',
                     block: 'start'
@@ -212,7 +256,7 @@
             var encodedName;
 
             if (!name) {
-                setNotice('Masukkan nama tamu untuk membuat undangan.', 'error');
+                setNotice(getString('nameRequired', 'Masukkan nama tamu untuk membuat undangan.'), 'error');
                 nameInput.setAttribute('aria-invalid', 'true');
                 nameInput.focus();
                 return false;
@@ -250,13 +294,9 @@
             });
 
             result.hidden = false;
-            setNotice('Tiga versi undangan berhasil dibuat dan siap dibagikan.', 'success');
+            setNotice(getString('generated', 'Tiga versi undangan berhasil dibuat dan siap dibagikan.'), 'success');
             scrollToResult();
             return true;
-        }
-
-        if (!nameInput || !phoneInput || !generateButton || !result || !urlId || !urlEn || !tabs.length || !messageFields.length) {
-            return;
         }
 
         tabs.forEach(function (tab, index) {
@@ -319,12 +359,25 @@
                     return;
                 }
 
-                copyValue(
-                    textarea,
-                    setNotice,
-                    language === 'en' ? 'English message copied.' : 'Kalimat Indonesia berhasil disalin.'
-                );
-                flashButtonLabel(button, language === 'en' ? 'Copied' : 'Tersalin');
+                copyValue(textarea).then(function () {
+                    setNotice(
+                        language === 'en'
+                            ? getString('copyEnSuccess', 'English message copied.')
+                            : getString('copyIdSuccess', 'Kalimat Indonesia berhasil disalin.'),
+                        'success'
+                    );
+                    flashButtonLabel(
+                        button,
+                        language === 'en'
+                            ? getString('copiedEn', 'Copied')
+                            : getString('copiedId', 'Tersalin')
+                    );
+                }).catch(function () {
+                    setNotice(
+                        getString('copyError', 'Pesan tidak dapat disalin. Silakan salin secara manual.'),
+                        'error'
+                    );
+                });
             });
         });
 

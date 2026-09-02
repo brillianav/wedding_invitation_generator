@@ -16,7 +16,6 @@
     --brilli-forest: #6a8145;
     --brilli-forest-deep: #24291a;
     --brilli-wood: #654318;
-    --brilli-orange: #d37f36;
     --brilli-cream: #fff4df;
     --brilli-paper: #fffaf0;
     --brilli-gold: #db9e53;
@@ -92,7 +91,7 @@
     background:
         radial-gradient(circle at 82% 14%, rgba(145, 204, 215, .28), transparent 25%),
         radial-gradient(circle at 64% 95%, rgba(239, 107, 95, .18), transparent 27%),
-        linear-gradient(135deg, #24291a 0%, #654318 100%);
+        linear-gradient(135deg, var(--brilli-ink) 0%, var(--brilli-wood) 100%);
 }
 
 .brilli-wim__intro::before {
@@ -185,7 +184,7 @@
     margin-left: 26px;
     border: 1px solid var(--brilli-line);
     border-radius: 20px;
-    background: rgba(255, 250, 240, .97);
+    background: var(--brilli-paper);
     box-shadow: 0 16px 44px rgba(101, 67, 24, .1);
 }
 
@@ -393,13 +392,13 @@
 
 .brilli-wim__notice[data-state="error"] {
     padding: 10px 12px;
-    color: #8e342f;
+    color: var(--brilli-danger);
     background: #fff0e9;
 }
 
 .brilli-wim__notice[data-state="success"] {
     padding: 10px 12px;
-    color: #3c602b;
+    color: var(--brilli-success);
     background: #edf5df;
 }
 

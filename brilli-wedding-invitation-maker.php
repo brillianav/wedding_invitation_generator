@@ -3,42 +3,90 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.4.2
+ * Version: 1.5.0
+ * Requires at least: 5.8
+ * Requires PHP: 5.6
  * Author: Brillian AV
  * Author URI: https://brillianav.com
  * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: brilli-wedding-invitation-maker
+ * Domain Path: /languages
  */
 
 if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!defined('BRILLI_WIM_PLUGIN_FILE')) {
+    define('BRILLI_WIM_PLUGIN_FILE', __FILE__);
+}
+
+if (!defined('BRILLI_WIM_PLUGIN_URL')) {
+    define('BRILLI_WIM_PLUGIN_URL', plugin_dir_url(__FILE__));
+}
+
 if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
+    /**
+     * Main plugin controller.
+     */
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.4.2';
+        const VERSION = '1.5.0';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
+        const OPTION_GROUP = 'brilli_wedding_invitation_maker_group';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
         const SHORTCODE = 'brilli_wedding_invitation_maker';
+        const SHORTCODE_ALIAS = 'brilli_wedding_invitation';
+        const ADMIN_STYLE_HANDLE = 'brilli-wedding-invitation-maker-admin';
+        const STYLE_HANDLE = 'brilli-wedding-invitation-maker-style';
+        const SCRIPT_HANDLE = 'brilli-wedding-invitation-maker-script';
 
+        /**
+         * Hook suffix for the plugin's top-level admin page.
+         *
+         * @var string
+         */
         private $admin_page_hook = '';
 
-        public function __construct() {
+        /**
+         * Register WordPress hooks and shortcodes.
+         */
+        public function register_hooks() {
+            add_action('init', array($this, 'load_textdomain'));
             add_action('admin_menu', array($this, 'add_admin_menu'));
             add_action('admin_init', array($this, 'register_settings'));
             add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
             add_action('wp_enqueue_scripts', array($this, 'register_assets'));
-            add_filter('plugin_action_links_' . plugin_basename(__FILE__), array($this, 'add_plugin_action_links'));
+            add_filter('plugin_action_links_' . plugin_basename(BRILLI_WIM_PLUGIN_FILE), array($this, 'add_plugin_action_links'));
             add_shortcode(self::SHORTCODE, array($this, 'render_shortcode'));
-            add_shortcode('brilli_wedding_invitation', array($this, 'render_shortcode'));
+            add_shortcode(self::SHORTCODE_ALIAS, array($this, 'render_shortcode'));
         }
 
+        /**
+         * Load plugin translations for private and non-directory installs.
+         */
+        public function load_textdomain() {
+            load_plugin_textdomain(
+                'brilli-wedding-invitation-maker',
+                false,
+                dirname(plugin_basename(BRILLI_WIM_PLUGIN_FILE)) . '/languages'
+            );
+        }
+
+        /**
+         * Create default settings on first activation.
+         */
         public static function activate() {
             if (false === get_option(self::OPTION_KEY, false)) {
-                add_option(self::OPTION_KEY, self::default_options_static());
+                add_option(self::OPTION_KEY, self::default_options_static(), '', false);
             }
         }
 
+        /**
+         * Return the complete default option set.
+         *
+         * @return array
+         */
         public static function default_options_static() {
             return array(
                 'base_url_id' => 'https://brillian.my.id/',
@@ -60,10 +108,20 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             );
         }
 
+        /**
+         * Return default settings for instance methods.
+         *
+         * @return array
+         */
         public function default_options() {
             return self::default_options_static();
         }
 
+        /**
+         * Merge saved settings with defaults and legacy keys.
+         *
+         * @return array
+         */
         public function get_options() {
             $saved = get_option(self::OPTION_KEY, array());
 
@@ -85,10 +143,13 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             return $options;
         }
 
+        /**
+         * Add the top-level admin menu page.
+         */
         public function add_admin_menu() {
             $this->admin_page_hook = add_menu_page(
-                'Wedding Invitation Maker - BRILLI',
-                'Wedding Invitation',
+                __('Wedding Invitation Maker - BRILLI', 'brilli-wedding-invitation-maker'),
+                __('Wedding Invitation', 'brilli-wedding-invitation-maker'),
                 'manage_options',
                 self::MENU_SLUG,
                 array($this, 'render_admin_page'),
@@ -97,19 +158,30 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             );
         }
 
+        /**
+         * Enqueue admin CSS only on the plugin page.
+         *
+         * @param string $hook_suffix Current admin page hook suffix.
+         */
         public function enqueue_admin_assets($hook_suffix) {
             if ($this->admin_page_hook !== $hook_suffix) {
                 return;
             }
 
             wp_enqueue_style(
-                'brilli-wedding-invitation-maker-admin',
-                plugin_dir_url(__FILE__) . 'assets/brilli-wedding-invitation-maker-admin.css',
+                self::ADMIN_STYLE_HANDLE,
+                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker-admin.css',
                 array(),
                 self::VERSION
             );
         }
 
+        /**
+         * Add a settings shortcut to the Plugins screen.
+         *
+         * @param array $links Existing plugin action links.
+         * @return array
+         */
         public function add_plugin_action_links($links) {
             $settings_link = sprintf(
                 '<a href="%s">%s</a>',
@@ -122,36 +194,62 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             return $links;
         }
 
+        /**
+         * Register the plugin's Settings API option.
+         */
         public function register_settings() {
             register_setting(
-                'brilli_wedding_invitation_maker_group',
+                self::OPTION_GROUP,
                 self::OPTION_KEY,
-                array($this, 'sanitize_options')
+                array(
+                    'type' => 'array',
+                    'sanitize_callback' => array($this, 'sanitize_options'),
+                    'default' => self::default_options_static(),
+                    'show_in_rest' => false,
+                )
             );
         }
 
+        /**
+         * Sanitize all values submitted from the settings page.
+         *
+         * @param mixed $input Submitted option value.
+         * @return array
+         */
         public function sanitize_options($input) {
             $defaults = $this->default_options();
             $output = array();
+            $button_keys = array(
+                'generate_button',
+                'copy_id_button',
+                'copy_en_button',
+                'whatsapp_id_button',
+                'whatsapp_en_button',
+            );
 
+            // options.php unslashes registered settings before this callback runs.
             $input = is_array($input) ? $input : array();
 
-            $output['base_url_id'] = isset($input['base_url_id']) ? esc_url_raw(trim($input['base_url_id'])) : $defaults['base_url_id'];
-            $output['base_url_en'] = isset($input['base_url_en']) ? esc_url_raw(trim($input['base_url_en'])) : $defaults['base_url_en'];
-            $output['url_param'] = isset($input['url_param']) ? sanitize_key(trim($input['url_param'])) : $defaults['url_param'];
-            $output['custom_url_id'] = isset($input['custom_url_id']) ? sanitize_text_field(trim($input['custom_url_id'])) : '';
-            $output['custom_url_en'] = isset($input['custom_url_en']) ? sanitize_text_field(trim($input['custom_url_en'])) : '';
+            $output['base_url_id'] = esc_url_raw(trim($this->get_input_value($input, 'base_url_id', $defaults['base_url_id'])), array('http', 'https'));
+            $output['base_url_en'] = esc_url_raw(trim($this->get_input_value($input, 'base_url_en', $defaults['base_url_en'])), array('http', 'https'));
+            $output['url_param'] = sanitize_key($this->get_input_value($input, 'url_param', $defaults['url_param']));
+            $output['custom_url_id'] = $this->sanitize_url_template($this->get_input_value($input, 'custom_url_id'));
+            $output['custom_url_en'] = $this->sanitize_url_template($this->get_input_value($input, 'custom_url_en'));
+
             foreach (array('formal', 'casual', 'warm') as $template_key) {
                 foreach (array('id', 'en') as $language) {
                     $option_key = 'message_' . $template_key . '_' . $language;
-                    $output[$option_key] = isset($input[$option_key]) ? wp_kses_post($input[$option_key]) : $defaults[$option_key];
+                    $output[$option_key] = sanitize_textarea_field($this->get_input_value($input, $option_key, $defaults[$option_key]));
                 }
             }
-            $output['generate_button'] = isset($input['generate_button']) ? sanitize_text_field($input['generate_button']) : $defaults['generate_button'];
-            $output['copy_id_button'] = isset($input['copy_id_button']) ? sanitize_text_field($input['copy_id_button']) : $defaults['copy_id_button'];
-            $output['copy_en_button'] = isset($input['copy_en_button']) ? sanitize_text_field($input['copy_en_button']) : $defaults['copy_en_button'];
-            $output['whatsapp_id_button'] = isset($input['whatsapp_id_button']) ? sanitize_text_field($input['whatsapp_id_button']) : $defaults['whatsapp_id_button'];
-            $output['whatsapp_en_button'] = isset($input['whatsapp_en_button']) ? sanitize_text_field($input['whatsapp_en_button']) : $defaults['whatsapp_en_button'];
+
+            foreach ($button_keys as $button_key) {
+                $output[$button_key] = sanitize_text_field($this->get_input_value($input, $button_key, $defaults[$button_key]));
+
+                if ('' === $output[$button_key]) {
+                    $output[$button_key] = $defaults[$button_key];
+                }
+            }
 
             if (empty($output['base_url_id']) && empty($output['custom_url_id'])) {
                 $output['base_url_id'] = $defaults['base_url_id'];
@@ -168,50 +266,115 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             return $output;
         }
 
+        /**
+         * Read a string value from submitted settings.
+         *
+         * @param array  $input   Submitted settings.
+         * @param string $key     Option key.
+         * @param string $default Fallback value.
+         * @return string
+         */
+        private function get_input_value($input, $key, $default = '') {
+            if (!isset($input[$key]) || !is_string($input[$key])) {
+                return $default;
+            }
+
+            return $input[$key];
+        }
+
+        /**
+         * Validate a URL template while preserving supported placeholders.
+         *
+         * @param string $value Submitted URL template.
+         * @return string
+         */
+        private function sanitize_url_template($value) {
+            static $invalid_url_reported = false;
+
+            $value = trim(sanitize_text_field($value));
+
+            if ('' === $value) {
+                return '';
+            }
+
+            $validation_url = strtr(
+                $value,
+                array(
+                    '{name}' => 'Guest-Name',
+                    '{encoded_name}' => 'Guest-Name',
+                    '{phone}' => '628123456789',
+                )
+            );
+            $scheme = wp_parse_url($validation_url, PHP_URL_SCHEME);
+            $host = wp_parse_url($validation_url, PHP_URL_HOST);
+
+            if (!in_array($scheme, array('http', 'https'), true) || empty($host)) {
+                if (!$invalid_url_reported) {
+                    add_settings_error(
+                        self::OPTION_KEY,
+                        'brilli_wim_invalid_url_template',
+                        __('Template URL khusus harus berupa URL HTTP atau HTTPS yang valid.', 'brilli-wedding-invitation-maker'),
+                        'error'
+                    );
+                    $invalid_url_reported = true;
+                }
+
+                return '';
+            }
+
+            return $value;
+        }
+
+        /**
+         * Register frontend assets for on-demand shortcode loading.
+         */
         public function register_assets() {
             wp_register_style(
-                'brilli-wedding-invitation-maker-style',
-                plugin_dir_url(__FILE__) . 'assets/brilli-wedding-invitation-maker.css',
+                self::STYLE_HANDLE,
+                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker.css',
                 array(),
                 self::VERSION
             );
 
             wp_register_script(
-                'brilli-wedding-invitation-maker-script',
-                plugin_dir_url(__FILE__) . 'assets/brilli-wedding-invitation-maker.js',
+                self::SCRIPT_HANDLE,
+                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker.js',
                 array(),
                 self::VERSION,
                 true
             );
         }
 
+        /**
+         * Render the plugin settings page.
+         */
         public function render_admin_page() {
             if (!current_user_can('manage_options')) {
                 return;
             }
 
             $options = $this->get_options();
-            $logo_url = plugin_dir_url(__FILE__) . 'assets/logo-bav-white.png';
+            $logo_url = BRILLI_WIM_PLUGIN_URL . 'assets/logo-bav-white.png';
             $template_sections = array(
                 'formal' => array(
-                    'label' => 'Formal',
-                    'description' => 'Untuk keluarga, kolega, dan relasi yang membutuhkan bahasa resmi.',
+                    'label' => __('Formal', 'brilli-wedding-invitation-maker'),
+                    'description' => __('Untuk keluarga, kolega, dan relasi yang membutuhkan bahasa resmi.', 'brilli-wedding-invitation-maker'),
                 ),
                 'casual' => array(
-                    'label' => 'Nonformal 1',
-                    'description' => 'Untuk teman dan kenalan dengan bahasa yang lebih santai.',
+                    'label' => __('Nonformal 1', 'brilli-wedding-invitation-maker'),
+                    'description' => __('Untuk teman dan kenalan dengan bahasa yang lebih santai.', 'brilli-wedding-invitation-maker'),
                 ),
                 'warm' => array(
-                    'label' => 'Nonformal 2',
-                    'description' => 'Untuk sahabat dan orang terdekat dengan bahasa yang hangat.',
+                    'label' => __('Nonformal 2', 'brilli-wedding-invitation-maker'),
+                    'description' => __('Untuk sahabat dan orang terdekat dengan bahasa yang hangat.', 'brilli-wedding-invitation-maker'),
                 ),
             );
             $button_fields = array(
-                'generate_button' => array('Tombol generate', 'Tindakan utama untuk membuat semua versi pesan.'),
-                'copy_id_button' => array('Salin Indonesia', 'Menyalin pesan berbahasa Indonesia.'),
-                'copy_en_button' => array('Salin English', 'Menyalin pesan berbahasa Inggris.'),
-                'whatsapp_id_button' => array('WhatsApp Indonesia', 'Membuka WhatsApp dengan pesan Indonesia.'),
-                'whatsapp_en_button' => array('WhatsApp English', 'Membuka WhatsApp dengan pesan Inggris.'),
+                'generate_button' => array(__('Tombol generate', 'brilli-wedding-invitation-maker'), __('Tindakan utama untuk membuat semua versi pesan.', 'brilli-wedding-invitation-maker')),
+                'copy_id_button' => array(__('Salin Indonesia', 'brilli-wedding-invitation-maker'), __('Menyalin pesan berbahasa Indonesia.', 'brilli-wedding-invitation-maker')),
+                'copy_en_button' => array(__('Salin English', 'brilli-wedding-invitation-maker'), __('Menyalin pesan berbahasa Inggris.', 'brilli-wedding-invitation-maker')),
+                'whatsapp_id_button' => array(__('WhatsApp Indonesia', 'brilli-wedding-invitation-maker'), __('Membuka WhatsApp dengan pesan Indonesia.', 'brilli-wedding-invitation-maker')),
+                'whatsapp_en_button' => array(__('WhatsApp English', 'brilli-wedding-invitation-maker'), __('Membuka WhatsApp dengan pesan Inggris.', 'brilli-wedding-invitation-maker')),
             );
             ?>
             <div class="wrap brilli-wim-admin">
@@ -221,92 +384,104 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                     <div class="brilli-wim-admin__brand">
                         <img src="<?php echo esc_url($logo_url); ?>" width="84" height="84" alt="BRILLI">
                         <div>
-                            <span class="brilli-wim-admin__eyebrow">BRILLI tools</span>
-                            <h1>Wedding Invitation Maker</h1>
-                            <p>Kelola tautan dan enam template pesan undangan dari satu tempat.</p>
+                            <span class="brilli-wim-admin__eyebrow"><?php esc_html_e('BRILLI tools', 'brilli-wedding-invitation-maker'); ?></span>
+                            <h1><?php esc_html_e('Wedding Invitation Maker', 'brilli-wedding-invitation-maker'); ?></h1>
+                            <p><?php esc_html_e('Kelola tautan dan enam template pesan undangan dari satu tempat.', 'brilli-wedding-invitation-maker'); ?></p>
                         </div>
                     </div>
                     <div class="brilli-wim-admin__hero-actions">
-                        <span class="brilli-wim-admin__version">Versi <?php echo esc_html(self::VERSION); ?></span>
-                        <a class="brilli-wim-admin__hero-link" href="#brilli-wim-usage">Lihat cara pakai</a>
+                        <span class="brilli-wim-admin__version"><?php esc_html_e('Versi', 'brilli-wedding-invitation-maker'); ?> <?php echo esc_html(self::VERSION); ?></span>
+                        <a class="brilli-wim-admin__hero-link" href="#brilli-wim-usage"><?php esc_html_e('Lihat cara pakai', 'brilli-wedding-invitation-maker'); ?></a>
                     </div>
                 </header>
 
                 <div class="brilli-wim-admin__shell">
                     <aside class="brilli-wim-admin__sidebar">
-                        <nav class="brilli-wim-admin__nav" aria-label="Navigasi pengaturan">
-                            <a href="#brilli-wim-links"><span>01</span><strong>Tautan undangan</strong></a>
-                            <a href="#brilli-wim-messages"><span>02</span><strong>Template pesan</strong></a>
-                            <a href="#brilli-wim-buttons"><span>03</span><strong>Label tombol</strong></a>
-                            <a href="#brilli-wim-usage"><span>04</span><strong>Cara pakai</strong></a>
+                        <nav class="brilli-wim-admin__nav" aria-label="<?php esc_attr_e('Navigasi pengaturan', 'brilli-wedding-invitation-maker'); ?>">
+                            <a href="#brilli-wim-links"><span>01</span><strong><?php esc_html_e('Tautan undangan', 'brilli-wedding-invitation-maker'); ?></strong></a>
+                            <a href="#brilli-wim-messages"><span>02</span><strong><?php esc_html_e('Template pesan', 'brilli-wedding-invitation-maker'); ?></strong></a>
+                            <a href="#brilli-wim-buttons"><span>03</span><strong><?php esc_html_e('Label tombol', 'brilli-wedding-invitation-maker'); ?></strong></a>
+                            <a href="#brilli-wim-usage"><span>04</span><strong><?php esc_html_e('Cara pakai', 'brilli-wedding-invitation-maker'); ?></strong></a>
                         </nav>
 
                         <div class="brilli-wim-admin__quick-card">
-                            <span>Shortcode utama</span>
+                            <span><?php esc_html_e('Shortcode utama', 'brilli-wedding-invitation-maker'); ?></span>
                             <code>[<?php echo esc_html(self::SHORTCODE); ?>]</code>
-                            <p>Tempel di Elementor, Gutenberg, atau widget shortcode.</p>
+                            <p><?php esc_html_e('Tempel di Elementor, Gutenberg, atau widget shortcode.', 'brilli-wedding-invitation-maker'); ?></p>
                         </div>
                     </aside>
 
                     <main class="brilli-wim-admin__content">
                         <form method="post" action="options.php">
-                            <?php settings_fields('brilli_wedding_invitation_maker_group'); ?>
+                            <?php settings_fields(self::OPTION_GROUP); ?>
 
                             <section id="brilli-wim-links" class="brilli-wim-admin__card">
                                 <div class="brilli-wim-admin__card-heading">
-                                    <span>Langkah 1</span>
-                                    <h2>Tautan undangan</h2>
-                                    <p>Tentukan halaman undangan untuk setiap bahasa. Nama tamu ditambahkan otomatis ke URL.</p>
+                                    <span><?php esc_html_e('Langkah 1', 'brilli-wedding-invitation-maker'); ?></span>
+                                    <h2><?php esc_html_e('Tautan undangan', 'brilli-wedding-invitation-maker'); ?></h2>
+                                    <p><?php esc_html_e('Tentukan halaman undangan untuk setiap bahasa. Nama tamu ditambahkan otomatis ke URL.', 'brilli-wedding-invitation-maker'); ?></p>
                                 </div>
 
                                 <div class="brilli-wim-admin__field-grid">
                                     <div class="brilli-wim-admin__field">
-                                        <label for="brilli_wim_base_url_id">URL Indonesia</label>
+                                        <label for="brilli_wim_base_url_id"><?php esc_html_e('URL Indonesia', 'brilli-wedding-invitation-maker'); ?></label>
                                         <input type="url" id="brilli_wim_base_url_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[base_url_id]" value="<?php echo esc_attr($options['base_url_id']); ?>" placeholder="https://brillian.my.id/">
-                                        <p>Halaman utama untuk tamu berbahasa Indonesia.</p>
+                                        <p><?php esc_html_e('Halaman utama untuk tamu berbahasa Indonesia.', 'brilli-wedding-invitation-maker'); ?></p>
                                     </div>
 
                                     <div class="brilli-wim-admin__field">
-                                        <label for="brilli_wim_base_url_en">URL English</label>
+                                        <label for="brilli_wim_base_url_en"><?php esc_html_e('URL English', 'brilli-wedding-invitation-maker'); ?></label>
                                         <input type="url" id="brilli_wim_base_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[base_url_en]" value="<?php echo esc_attr($options['base_url_en']); ?>" placeholder="https://brillian.my.id/en/">
-                                        <p>Halaman utama untuk tamu berbahasa Inggris.</p>
+                                        <p><?php esc_html_e('Halaman utama untuk tamu berbahasa Inggris.', 'brilli-wedding-invitation-maker'); ?></p>
                                     </div>
 
                                     <div class="brilli-wim-admin__field brilli-wim-admin__field--compact">
-                                        <label for="brilli_wim_url_param">Parameter nama</label>
+                                        <label for="brilli_wim_url_param"><?php esc_html_e('Parameter nama', 'brilli-wedding-invitation-maker'); ?></label>
                                         <input type="text" id="brilli_wim_url_param" name="<?php echo esc_attr(self::OPTION_KEY); ?>[url_param]" value="<?php echo esc_attr($options['url_param']); ?>" placeholder="to">
-                                        <p>Gunakan <code>to</code> jika situs undangan memakai format <code>?to=Nama</code>.</p>
+                                        <p>
+                                            <?php
+                                            printf(
+                                                /* translators: 1: URL parameter name, 2: example query string. */
+                                                wp_kses(
+                                                    __('Gunakan %1$s jika situs undangan memakai format %2$s.', 'brilli-wedding-invitation-maker'),
+                                                    array('code' => array())
+                                                ),
+                                                '<code>to</code>',
+                                                '<code>?to=Nama</code>'
+                                            );
+                                            ?>
+                                        </p>
                                     </div>
                                 </div>
 
                                 <details class="brilli-wim-admin__advanced">
-                                    <summary>Atur template URL khusus <span>Opsional</span></summary>
+                                    <summary><?php esc_html_e('Atur template URL khusus', 'brilli-wedding-invitation-maker'); ?> <span><?php esc_html_e('Opsional', 'brilli-wedding-invitation-maker'); ?></span></summary>
                                     <div class="brilli-wim-admin__advanced-content">
-                                        <p>Isi bagian ini hanya jika struktur URL Anda berbeda. Template khusus akan menggantikan URL utama di atas.</p>
+                                        <p><?php esc_html_e('Isi bagian ini hanya jika struktur URL Anda berbeda. Template khusus akan menggantikan URL utama di atas.', 'brilli-wedding-invitation-maker'); ?></p>
                                         <div class="brilli-wim-admin__field-grid">
                                             <div class="brilli-wim-admin__field">
-                                                <label for="brilli_wim_custom_url_id">Template URL Indonesia</label>
+                                                <label for="brilli_wim_custom_url_id"><?php esc_html_e('Template URL Indonesia', 'brilli-wedding-invitation-maker'); ?></label>
                                                 <input type="text" id="brilli_wim_custom_url_id" name="<?php echo esc_attr(self::OPTION_KEY); ?>[custom_url_id]" value="<?php echo esc_attr($options['custom_url_id']); ?>" placeholder="https://brillian.my.id/?to={encoded_name}">
                                             </div>
                                             <div class="brilli-wim-admin__field">
-                                                <label for="brilli_wim_custom_url_en">Template URL English</label>
+                                                <label for="brilli_wim_custom_url_en"><?php esc_html_e('Template URL English', 'brilli-wedding-invitation-maker'); ?></label>
                                                 <input type="text" id="brilli_wim_custom_url_en" name="<?php echo esc_attr(self::OPTION_KEY); ?>[custom_url_en]" value="<?php echo esc_attr($options['custom_url_en']); ?>" placeholder="https://brillian.my.id/en/?to={encoded_name}">
                                             </div>
                                         </div>
-                                        <p class="brilli-wim-admin__helper">Placeholder URL: <code>{name}</code> <code>{encoded_name}</code> <code>{phone}</code></p>
+                                        <p class="brilli-wim-admin__helper"><?php esc_html_e('Placeholder URL:', 'brilli-wedding-invitation-maker'); ?> <code>{name}</code> <code>{encoded_name}</code> <code>{phone}</code></p>
                                     </div>
                                 </details>
                             </section>
 
                             <section id="brilli-wim-messages" class="brilli-wim-admin__card">
                                 <div class="brilli-wim-admin__card-heading">
-                                    <span>Langkah 2</span>
-                                    <h2>Template pesan</h2>
-                                    <p>Sesuaikan gaya pesan untuk setiap tamu dalam bahasa Indonesia dan Inggris.</p>
+                                    <span><?php esc_html_e('Langkah 2', 'brilli-wedding-invitation-maker'); ?></span>
+                                    <h2><?php esc_html_e('Template pesan', 'brilli-wedding-invitation-maker'); ?></h2>
+                                    <p><?php esc_html_e('Sesuaikan gaya pesan untuk setiap tamu dalam bahasa Indonesia dan Inggris.', 'brilli-wedding-invitation-maker'); ?></p>
                                 </div>
 
-                                <div class="brilli-wim-admin__tokens" aria-label="Placeholder yang tersedia">
-                                    <span>Placeholder:</span>
+                                <div class="brilli-wim-admin__tokens" aria-label="<?php esc_attr_e('Placeholder yang tersedia', 'brilli-wedding-invitation-maker'); ?>">
+                                    <span><?php esc_html_e('Placeholder:', 'brilli-wedding-invitation-maker'); ?></span>
                                     <code>{name}</code>
                                     <code>{phone}</code>
                                     <code>{invitation_url}</code>
@@ -320,7 +495,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                                             <p><?php echo esc_html($template['description']); ?></p>
                                         </div>
                                         <div class="brilli-wim-admin__template-grid">
-                                            <?php foreach (array('id' => 'Indonesia', 'en' => 'English') as $language_key => $language_label) : ?>
+                                            <?php foreach (array('id' => __('Indonesia', 'brilli-wedding-invitation-maker'), 'en' => __('English', 'brilli-wedding-invitation-maker')) as $language_key => $language_label) : ?>
                                                 <?php
                                                 $option_key = 'message_' . $template_key . '_' . $language_key;
                                                 $field_id = 'brilli_wim_' . $option_key;
@@ -337,9 +512,9 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
 
                             <section id="brilli-wim-buttons" class="brilli-wim-admin__card">
                                 <div class="brilli-wim-admin__card-heading">
-                                    <span>Langkah 3</span>
-                                    <h2>Label tombol</h2>
-                                    <p>Gunakan label singkat agar setiap tindakan mudah dipahami tamu.</p>
+                                    <span><?php esc_html_e('Langkah 3', 'brilli-wedding-invitation-maker'); ?></span>
+                                    <h2><?php esc_html_e('Label tombol', 'brilli-wedding-invitation-maker'); ?></h2>
+                                    <p><?php esc_html_e('Gunakan label singkat agar setiap tindakan mudah dipahami tamu.', 'brilli-wedding-invitation-maker'); ?></p>
                                 </div>
 
                                 <div class="brilli-wim-admin__button-grid">
@@ -355,33 +530,33 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
 
                             <div class="brilli-wim-admin__savebar">
                                 <div>
-                                    <strong>Simpan pengaturan</strong>
-                                    <span>Perubahan langsung digunakan oleh shortcode.</span>
+                                    <strong><?php esc_html_e('Simpan pengaturan', 'brilli-wedding-invitation-maker'); ?></strong>
+                                    <span><?php esc_html_e('Perubahan langsung digunakan oleh shortcode.', 'brilli-wedding-invitation-maker'); ?></span>
                                 </div>
-                                <?php submit_button('Simpan perubahan', 'primary large', 'submit', false); ?>
+                                <?php submit_button(__('Simpan perubahan', 'brilli-wedding-invitation-maker'), 'primary large', 'submit', false); ?>
                             </div>
                         </form>
 
                         <section id="brilli-wim-usage" class="brilli-wim-admin__card brilli-wim-admin__usage">
                             <div class="brilli-wim-admin__card-heading">
-                                <span>Langkah 4</span>
-                                <h2>Pasang di halaman</h2>
-                                <p>Tambahkan salah satu shortcode berikut ke halaman tempat generator undangan akan ditampilkan.</p>
+                                <span><?php esc_html_e('Langkah 4', 'brilli-wedding-invitation-maker'); ?></span>
+                                <h2><?php esc_html_e('Pasang di halaman', 'brilli-wedding-invitation-maker'); ?></h2>
+                                <p><?php esc_html_e('Tambahkan salah satu shortcode berikut ke halaman tempat generator undangan akan ditampilkan.', 'brilli-wedding-invitation-maker'); ?></p>
                             </div>
                             <div class="brilli-wim-admin__shortcodes">
                                 <div>
-                                    <span>Direkomendasikan</span>
+                                    <span><?php esc_html_e('Direkomendasikan', 'brilli-wedding-invitation-maker'); ?></span>
                                     <code>[<?php echo esc_html(self::SHORTCODE); ?>]</code>
                                 </div>
                                 <div>
-                                    <span>Alias singkat</span>
-                                    <code>[brilli_wedding_invitation]</code>
+                                    <span><?php esc_html_e('Alias singkat', 'brilli-wedding-invitation-maker'); ?></span>
+                                    <code>[<?php echo esc_html(self::SHORTCODE_ALIAS); ?>]</code>
                                 </div>
                             </div>
                         </section>
 
                         <footer class="brilli-wim-admin__footer">
-                            <span>Wedding Invitation Maker by BRILLI</span>
+                            <span><?php esc_html_e('Wedding Invitation Maker by BRILLI', 'brilli-wedding-invitation-maker'); ?></span>
                             <a href="https://brillianav.com" target="_blank" rel="noopener noreferrer">brillianav.com</a>
                         </footer>
                     </main>
@@ -390,11 +565,17 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             <?php
         }
 
-        public function render_shortcode($atts) {
+        /**
+         * Render a wedding invitation generator instance.
+         *
+         * @param array $_atts Shortcode attributes reserved for future use.
+         * @return string
+         */
+        public function render_shortcode($_atts) {
             $options = $this->get_options();
 
-            wp_enqueue_style('brilli-wedding-invitation-maker-style');
-            wp_enqueue_script('brilli-wedding-invitation-maker-script');
+            wp_enqueue_style(self::STYLE_HANDLE);
+            wp_enqueue_script(self::SCRIPT_HANDLE);
 
             $settings = array(
                 'baseUrlId' => esc_url_raw($options['base_url_id']),
@@ -416,27 +597,36 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         'en' => $options['message_warm_en'],
                     ),
                 ),
+                'i18n' => array(
+                    'nameRequired' => __('Masukkan nama tamu untuk membuat undangan.', 'brilli-wedding-invitation-maker'),
+                    'generated' => __('Tiga versi undangan berhasil dibuat dan siap dibagikan.', 'brilli-wedding-invitation-maker'),
+                    'copyIdSuccess' => __('Kalimat Indonesia berhasil disalin.', 'brilli-wedding-invitation-maker'),
+                    'copyEnSuccess' => __('English message copied.', 'brilli-wedding-invitation-maker'),
+                    'copyError' => __('Pesan tidak dapat disalin. Silakan salin secara manual.', 'brilli-wedding-invitation-maker'),
+                    'copiedId' => __('Tersalin', 'brilli-wedding-invitation-maker'),
+                    'copiedEn' => __('Copied', 'brilli-wedding-invitation-maker'),
+                ),
             );
 
             $wrapper_id = 'brilli-wim-' . wp_generate_uuid4();
             $templates = array(
-                'formal' => 'Formal',
-                'casual' => 'Nonformal 1',
-                'warm' => 'Nonformal 2',
+                'formal' => __('Formal', 'brilli-wedding-invitation-maker'),
+                'casual' => __('Nonformal 1', 'brilli-wedding-invitation-maker'),
+                'warm' => __('Nonformal 2', 'brilli-wedding-invitation-maker'),
             );
-            $hero_image_url = plugin_dir_url(__FILE__) . 'assets/favicon-wedding.png';
+            $hero_image_url = BRILLI_WIM_PLUGIN_URL . 'assets/favicon-wedding.png';
 
             ob_start();
             ?>
             <div id="<?php echo esc_attr($wrapper_id); ?>" class="brilli-wim" data-settings="<?php echo esc_attr(wp_json_encode($settings)); ?>">
                 <header class="brilli-wim__intro">
                     <div class="brilli-wim__intro-copy">
-                        <span class="brilli-wim__eyebrow"><i aria-hidden="true"></i> Wedding invitation studio</span>
-                        <h2>Buat pesan undangan yang terasa personal.</h2>
-                        <p>Isi data tamu sekali, lalu pilih gaya pesan dan bahasa yang paling sesuai.</p>
+                        <span class="brilli-wim__eyebrow"><i aria-hidden="true"></i> <?php esc_html_e('Wedding invitation studio', 'brilli-wedding-invitation-maker'); ?></span>
+                        <h2><?php esc_html_e('Buat pesan undangan yang terasa personal.', 'brilli-wedding-invitation-maker'); ?></h2>
+                        <p><?php esc_html_e('Isi data tamu sekali, lalu pilih gaya pesan dan bahasa yang paling sesuai.', 'brilli-wedding-invitation-maker'); ?></p>
                     </div>
                     <figure class="brilli-wim__hero-art">
-                        <img src="<?php echo esc_url($hero_image_url); ?>" width="190" height="190" alt="Ilustrasi pixel pasangan pengantin" decoding="async">
+                        <img src="<?php echo esc_url($hero_image_url); ?>" width="190" height="190" alt="<?php esc_attr_e('Ilustrasi pixel pasangan pengantin', 'brilli-wedding-invitation-maker'); ?>" decoding="async">
                     </figure>
                 </header>
 
@@ -444,20 +634,20 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                     <div class="brilli-wim__step-heading">
                         <span>01</span>
                         <div>
-                            <h3 id="<?php echo esc_attr($wrapper_id); ?>-guest-heading">Masukkan data tamu</h3>
-                            <p>Nama dipakai untuk mempersonalisasi tautan dan seluruh template pesan.</p>
+                            <h3 id="<?php echo esc_attr($wrapper_id); ?>-guest-heading"><?php esc_html_e('Masukkan data tamu', 'brilli-wedding-invitation-maker'); ?></h3>
+                            <p><?php esc_html_e('Nama dipakai untuk mempersonalisasi tautan dan seluruh template pesan.', 'brilli-wedding-invitation-maker'); ?></p>
                         </div>
                     </div>
 
                     <div class="brilli-wim__form-grid">
                         <div class="brilli-wim__field">
-                            <label for="<?php echo esc_attr($wrapper_id); ?>-name">Nama tamu</label>
-                            <input id="<?php echo esc_attr($wrapper_id); ?>-name" class="brilli-wim__name" type="text" placeholder="Contoh: Christopher Emmanuel" autocomplete="name" required aria-required="true">
+                            <label for="<?php echo esc_attr($wrapper_id); ?>-name"><?php esc_html_e('Nama tamu', 'brilli-wedding-invitation-maker'); ?></label>
+                            <input id="<?php echo esc_attr($wrapper_id); ?>-name" class="brilli-wim__name" type="text" placeholder="<?php esc_attr_e('Contoh: Christopher Emmanuel', 'brilli-wedding-invitation-maker'); ?>" autocomplete="name" required aria-required="true">
                         </div>
 
                         <div class="brilli-wim__field">
-                            <label for="<?php echo esc_attr($wrapper_id); ?>-phone">Nomor WhatsApp <span>Opsional</span></label>
-                            <input id="<?php echo esc_attr($wrapper_id); ?>-phone" class="brilli-wim__phone" type="tel" placeholder="Contoh: 08123456789" autocomplete="tel" inputmode="tel">
+                            <label for="<?php echo esc_attr($wrapper_id); ?>-phone"><?php esc_html_e('Nomor WhatsApp', 'brilli-wedding-invitation-maker'); ?> <span><?php esc_html_e('Opsional', 'brilli-wedding-invitation-maker'); ?></span></label>
+                            <input id="<?php echo esc_attr($wrapper_id); ?>-phone" class="brilli-wim__phone" type="tel" placeholder="<?php esc_attr_e('Contoh: 08123456789', 'brilli-wedding-invitation-maker'); ?>" autocomplete="tel" inputmode="tel">
                         </div>
                     </div>
 
@@ -466,29 +656,29 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                             <span><?php echo esc_html($options['generate_button']); ?></span>
                             <span aria-hidden="true">→</span>
                         </button>
-                        <p class="brilli-wim__privacy">Data hanya diproses di browser dan tidak dikirim ke server.</p>
+                        <p class="brilli-wim__privacy"><?php esc_html_e('Data hanya diproses di browser dan tidak dikirim ke server.', 'brilli-wedding-invitation-maker'); ?></p>
                     </div>
 
                     <p class="brilli-wim__notice" aria-live="polite" aria-atomic="true"></p>
                 </section>
 
-                <div class="brilli-wim__result" hidden>
+                <section class="brilli-wim__result" aria-labelledby="<?php echo esc_attr($wrapper_id); ?>-result-heading" hidden>
                     <div class="brilli-wim__result-heading">
                         <div class="brilli-wim__step-heading">
                             <span>02</span>
                             <div>
-                                <h3>Pesan siap dibagikan</h3>
-                                <p>Pilih gaya, periksa isi pesan, lalu salin atau kirim melalui WhatsApp.</p>
+                                <h3 id="<?php echo esc_attr($wrapper_id); ?>-result-heading"><?php esc_html_e('Pesan siap dibagikan', 'brilli-wedding-invitation-maker'); ?></h3>
+                                <p><?php esc_html_e('Pilih gaya, periksa isi pesan, lalu salin atau kirim melalui WhatsApp.', 'brilli-wedding-invitation-maker'); ?></p>
                             </div>
                         </div>
-                        <span class="brilli-wim__ready"><i aria-hidden="true"></i> Siap digunakan</span>
+                        <span class="brilli-wim__ready"><i aria-hidden="true"></i> <?php esc_html_e('Siap digunakan', 'brilli-wedding-invitation-maker'); ?></span>
                     </div>
 
                     <div class="brilli-wim__link-grid">
                         <div class="brilli-wim__link-card">
                             <span class="brilli-wim__language">ID</span>
                             <div class="brilli-wim__field">
-                                <label for="<?php echo esc_attr($wrapper_id); ?>-url-id">Tautan Indonesia</label>
+                                <label for="<?php echo esc_attr($wrapper_id); ?>-url-id"><?php esc_html_e('Tautan Indonesia', 'brilli-wedding-invitation-maker'); ?></label>
                                 <input id="<?php echo esc_attr($wrapper_id); ?>-url-id" class="brilli-wim__url brilli-wim__url--id" type="text" readonly>
                             </div>
                         </div>
@@ -496,13 +686,13 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         <div class="brilli-wim__link-card">
                             <span class="brilli-wim__language">EN</span>
                             <div class="brilli-wim__field">
-                                <label for="<?php echo esc_attr($wrapper_id); ?>-url-en">English invitation link</label>
+                                <label for="<?php echo esc_attr($wrapper_id); ?>-url-en"><?php esc_html_e('English invitation link', 'brilli-wedding-invitation-maker'); ?></label>
                                 <input id="<?php echo esc_attr($wrapper_id); ?>-url-en" class="brilli-wim__url brilli-wim__url--en" type="text" readonly>
                             </div>
                         </div>
                     </div>
 
-                    <div class="brilli-wim__tabs" role="tablist" aria-label="Pilih gaya kalimat undangan">
+                    <div class="brilli-wim__tabs" role="tablist" aria-label="<?php esc_attr_e('Pilih gaya kalimat undangan', 'brilli-wedding-invitation-maker'); ?>">
                         <?php $tab_index = 0; ?>
                         <?php foreach ($templates as $template_key => $template_label) : ?>
                             <button
@@ -536,11 +726,19 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                                     <div class="brilli-wim__message-heading">
                                         <span class="brilli-wim__language">ID</span>
                                         <div>
-                                            <h5>Bahasa Indonesia</h5>
-                                            <p>Untuk tamu berbahasa Indonesia.</p>
+                                            <h5><?php esc_html_e('Bahasa Indonesia', 'brilli-wedding-invitation-maker'); ?></h5>
+                                            <p><?php esc_html_e('Untuk tamu berbahasa Indonesia.', 'brilli-wedding-invitation-maker'); ?></p>
                                         </div>
                                     </div>
-                                    <label class="brilli-wim__sr-only" for="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-id">Pesan <?php echo esc_html($template_label); ?> bahasa Indonesia</label>
+                                    <label class="brilli-wim__sr-only" for="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-id">
+                                        <?php
+                                        printf(
+                                            /* translators: %s: invitation template name. */
+                                            esc_html__('Pesan %s bahasa Indonesia', 'brilli-wedding-invitation-maker'),
+                                            esc_html($template_label)
+                                        );
+                                        ?>
+                                    </label>
                                     <textarea id="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-id" class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="id" rows="14" readonly></textarea>
                                     <div class="brilli-wim__actions">
                                         <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="id"><?php echo esc_html($options['copy_id_button']); ?></button>
@@ -552,11 +750,19 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                                     <div class="brilli-wim__message-heading">
                                         <span class="brilli-wim__language">EN</span>
                                         <div>
-                                            <h5>English</h5>
-                                            <p>For English-speaking guests.</p>
+                                            <h5><?php esc_html_e('English', 'brilli-wedding-invitation-maker'); ?></h5>
+                                            <p><?php esc_html_e('For English-speaking guests.', 'brilli-wedding-invitation-maker'); ?></p>
                                         </div>
                                     </div>
-                                    <label class="brilli-wim__sr-only" for="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-en"><?php echo esc_html($template_label); ?> English message</label>
+                                    <label class="brilli-wim__sr-only" for="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-en">
+                                        <?php
+                                        printf(
+                                            /* translators: %s: invitation template name. */
+                                            esc_html__('%s English message', 'brilli-wedding-invitation-maker'),
+                                            esc_html($template_label)
+                                        );
+                                        ?>
+                                    </label>
                                     <textarea id="<?php echo esc_attr($wrapper_id . '-' . $template_key); ?>-message-en" class="brilli-wim__message" data-template="<?php echo esc_attr($template_key); ?>" data-language="en" rows="14" readonly></textarea>
                                     <div class="brilli-wim__actions">
                                         <button type="button" class="brilli-wim__copy" data-template="<?php echo esc_attr($template_key); ?>" data-language="en"><?php echo esc_html($options['copy_en_button']); ?></button>
@@ -567,13 +773,15 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </section>
                         <?php $panel_index++; ?>
                     <?php endforeach; ?>
-                </div>
+                </section>
             </div>
             <?php
             return ob_get_clean();
         }
     }
 
-    register_activation_hook(__FILE__, array('Brilli_Wedding_Invitation_Maker', 'activate'));
-    new Brilli_Wedding_Invitation_Maker();
+    register_activation_hook(BRILLI_WIM_PLUGIN_FILE, array('Brilli_Wedding_Invitation_Maker', 'activate'));
+
+    $brilli_wim_plugin = new Brilli_Wedding_Invitation_Maker();
+    $brilli_wim_plugin->register_hooks();
 }
