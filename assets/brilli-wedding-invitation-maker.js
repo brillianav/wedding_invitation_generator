@@ -1,68 +1,45 @@
 (function () {
     'use strict';
 
-    var HISTORY_STORAGE_KEY = 'brilliWimGenerationHistory:v1';
-    var HISTORY_LIMIT = 50;
-    var memoryHistory = [];
-
-    function normalizeHistory(entries) {
-        if (!Array.isArray(entries)) {
-            return [];
-        }
-
-        return entries.filter(function (entry) {
-            return entry && typeof entry.name === 'string' && entry.name.trim() && Number(entry.createdAt) > 0;
-        }).slice(0, HISTORY_LIMIT).map(function (entry) {
-            return {
-                name: entry.name.trim(),
-                createdAt: Number(entry.createdAt)
-            };
-        });
-    }
-
-    function readHistory() {
-        try {
-            var storedHistory = window.localStorage.getItem(HISTORY_STORAGE_KEY);
-
-            if (storedHistory !== null) {
-                memoryHistory = normalizeHistory(JSON.parse(storedHistory));
-            }
-        } catch (error) {
-            // Continue with in-memory history when browser storage is unavailable.
-        }
-
-        return memoryHistory.slice();
-    }
-
-    function writeHistory(entries) {
-        memoryHistory = normalizeHistory(entries);
-
-        try {
-            window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(memoryHistory));
-        } catch (error) {
-            // The current browser session still retains the in-memory copy.
-        }
-
-        document.dispatchEvent(new Event('brilli-wim-history-changed'));
-    }
-
-    function addHistoryEntry(name) {
-        var entries = readHistory();
-
-        entries.unshift({
-            name: String(name || '').trim(),
-            createdAt: Date.now()
-        });
-
-        writeHistory(entries);
-    }
-
     function getSettings(wrapper) {
         try {
             return JSON.parse(wrapper.getAttribute('data-settings') || '{}');
         } catch (error) {
             return {};
         }
+    }
+
+    function requestHistory(settings, action, data) {
+        var body = new URLSearchParams();
+
+        body.set('action', action);
+        body.set('nonce', settings.historyNonce || '');
+        body.set('page_id', String(settings.pageId || 0));
+
+        Object.keys(data || {}).forEach(function (key) {
+            body.set(key, String(data[key]));
+        });
+
+        return window.fetch(settings.ajaxUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+            },
+            body: body.toString()
+        }).then(function (response) {
+            if (!response.ok) {
+                throw new Error('History request failed.');
+            }
+
+            return response.json();
+        }).then(function (response) {
+            if (!response || !response.success) {
+                throw new Error(response && response.data && response.data.message ? response.data.message : 'History request failed.');
+            }
+
+            return response.data || {};
+        });
     }
 
     function encodeGuestName(name) {
@@ -234,9 +211,17 @@
         var historyList = wrapper.querySelector('.brilli-wim__history-list');
         var historyEmpty = wrapper.querySelector('.brilli-wim__history-empty');
         var historySummaryCount = wrapper.querySelector('.brilli-wim__history-summary-count');
+        var historyMore = wrapper.querySelector('.brilli-wim__history-more');
+        var historyStatus = wrapper.querySelector('.brilli-wim__history-status');
         var historyClear = wrapper.querySelector('.brilli-wim__history-clear');
         var historyClearTimer = null;
         var historyClearArmed = false;
+        var historyEntries = [];
+        var historyPage = 1;
+        var historyTotal = 0;
+        var historyHasMore = false;
+        var historyLoading = false;
+        var historyRequest = null;
 
         if (wrapper.getAttribute('data-brilli-wim-initialized') === 'true') {
             return;
@@ -349,20 +334,18 @@
         }
 
         function renderHistory() {
-            var entries = readHistory();
-
             if (historyCount) {
-                historyCount.textContent = String(entries.length);
+                historyCount.textContent = String(historyTotal);
             }
 
             if (historySummaryCount) {
-                historySummaryCount.textContent = String(entries.length);
+                historySummaryCount.textContent = String(historyTotal);
             }
 
             if (historyList) {
                 historyList.textContent = '';
 
-                entries.forEach(function (entry, index) {
+                historyEntries.forEach(function (entry, index) {
                     var item = document.createElement('li');
                     var number = document.createElement('span');
                     var details = document.createElement('div');
@@ -384,20 +367,93 @@
                     historyList.appendChild(item);
                 });
 
-                historyList.hidden = entries.length === 0;
+                historyList.hidden = historyEntries.length === 0;
             }
 
             if (historyEmpty) {
-                historyEmpty.hidden = entries.length > 0;
+                historyEmpty.hidden = historyLoading || historyEntries.length > 0;
+            }
+
+            if (historyMore) {
+                historyMore.hidden = !historyHasMore;
+                historyMore.disabled = historyLoading;
+                historyMore.textContent = historyLoading
+                    ? getString('historyLoading', 'Memuat riwayat…')
+                    : getString('historyLoadMore', 'Tampilkan lebih banyak');
             }
 
             if (historyClear) {
-                historyClear.disabled = entries.length === 0;
+                historyClear.disabled = historyLoading || historyTotal === 0;
             }
 
-            if (!entries.length) {
+            if (!historyTotal) {
                 resetHistoryClear();
             }
+        }
+
+        function setHistoryStatus(text, state) {
+            if (!historyStatus) {
+                return;
+            }
+
+            historyStatus.textContent = text || '';
+
+            if (text && state) {
+                historyStatus.setAttribute('data-state', state);
+            } else {
+                historyStatus.removeAttribute('data-state');
+            }
+        }
+
+        function fetchHistory(reset) {
+            var requestedPage;
+
+            if (historyLoading || !settings.ajaxUrl || !settings.pageId) {
+                return historyRequest || Promise.resolve();
+            }
+
+            requestedPage = reset ? 1 : historyPage + 1;
+            historyLoading = true;
+            setHistoryStatus(getString('historyLoading', 'Memuat riwayat…'), 'loading');
+            renderHistory();
+
+            historyRequest = requestHistory(settings, 'brilli_wim_get_history', {
+                history_page: requestedPage
+            }).then(function (data) {
+                var receivedEntries = Array.isArray(data.entries) ? data.entries : [];
+
+                historyEntries = reset ? receivedEntries : historyEntries.concat(receivedEntries);
+                historyPage = requestedPage;
+                historyTotal = Number(data.total) || 0;
+                historyHasMore = Boolean(data.hasMore);
+                historyLoading = false;
+                historyRequest = null;
+                setHistoryStatus('', '');
+                renderHistory();
+            }).catch(function () {
+                historyLoading = false;
+                historyRequest = null;
+                setHistoryStatus(getString('historyLoadError', 'Riwayat belum dapat dimuat. Silakan coba lagi.'), 'error');
+                renderHistory();
+            });
+
+            return historyRequest;
+        }
+
+        function saveHistory(name) {
+            if (!settings.ajaxUrl || !settings.pageId) {
+                return Promise.reject(new Error('History endpoint is unavailable.'));
+            }
+
+            return requestHistory(settings, 'brilli_wim_add_history', {
+                guest_name: name
+            }).then(function () {
+                var waitForCurrentRequest = historyRequest || Promise.resolve();
+
+                return waitForCurrentRequest.then(function () {
+                    return fetchHistory(true);
+                });
+            });
         }
 
         function openHistory() {
@@ -405,7 +461,7 @@
                 return;
             }
 
-            renderHistory();
+            fetchHistory(true);
 
             if (typeof historyDialog.showModal === 'function') {
                 historyDialog.showModal();
@@ -480,9 +536,11 @@
                 link.href = buildWhatsAppUrl(phone, textarea ? textarea.value : '');
             });
 
-            addHistoryEntry(name);
             result.hidden = false;
             setNotice(getString('generated', 'Tiga versi undangan berhasil dibuat dan siap dibagikan.'), 'success');
+            saveHistory(name).catch(function () {
+                setNotice(getString('historySaveError', 'Undangan berhasil dibuat, tetapi riwayat gagal disimpan.'), 'error');
+            });
             scrollToResult();
             return true;
         }
@@ -547,20 +605,35 @@
                     return;
                 }
 
-                writeHistory([]);
-                resetHistoryClear();
-                setNotice(getString('historyCleared', 'Riwayat berhasil dihapus.'), 'success');
+                historyLoading = true;
+                renderHistory();
+
+                requestHistory(settings, 'brilli_wim_clear_history', {}).then(function () {
+                    historyEntries = [];
+                    historyPage = 1;
+                    historyTotal = 0;
+                    historyHasMore = false;
+                    historyLoading = false;
+                    resetHistoryClear();
+                    setHistoryStatus('', '');
+                    setNotice(getString('historyCleared', 'Riwayat berhasil dihapus.'), 'success');
+                    renderHistory();
+                }).catch(function () {
+                    historyLoading = false;
+                    resetHistoryClear();
+                    setHistoryStatus(getString('historyLoadError', 'Riwayat belum dapat dimuat. Silakan coba lagi.'), 'error');
+                    renderHistory();
+                });
             });
         }
 
-        document.addEventListener('brilli-wim-history-changed', renderHistory);
-        window.addEventListener('storage', function (event) {
-            if (event.key === HISTORY_STORAGE_KEY) {
-                renderHistory();
-            }
-        });
+        if (historyMore) {
+            historyMore.addEventListener('click', function () {
+                fetchHistory(false);
+            });
+        }
 
-        renderHistory();
+        fetchHistory(true);
 
         nameInput.addEventListener('input', function () {
             if (nameInput.value.trim()) {

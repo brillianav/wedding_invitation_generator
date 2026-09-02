@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.6.0
+ * Version: 1.7.0
  * Requires at least: 5.8
  * Requires PHP: 5.6
  * Author: Brillian AV
@@ -31,7 +31,10 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
      * Main plugin controller.
      */
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.6.0';
+        const VERSION = '1.7.0';
+        const DB_VERSION = '1';
+        const DB_VERSION_OPTION = 'brilli_wim_db_version';
+        const HISTORY_PAGE_SIZE = 50;
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const OPTION_GROUP = 'brilli_wedding_invitation_maker_group';
         const MENU_SLUG = 'brilli-wedding-invitation-maker';
@@ -53,11 +56,17 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
          */
         public function register_hooks() {
             add_action('init', array($this, 'load_textdomain'));
+            add_action('init', array($this, 'maybe_upgrade_database'));
             add_action('admin_menu', array($this, 'add_admin_menu'));
             add_action('admin_init', array($this, 'register_settings'));
             add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_assets'));
             add_action('wp_enqueue_scripts', array($this, 'register_assets'));
             add_filter('plugin_action_links_' . plugin_basename(BRILLI_WIM_PLUGIN_FILE), array($this, 'add_plugin_action_links'));
+            add_action('wp_ajax_brilli_wim_add_history', array($this, 'ajax_add_history'));
+            add_action('wp_ajax_nopriv_brilli_wim_add_history', array($this, 'ajax_add_history'));
+            add_action('wp_ajax_brilli_wim_get_history', array($this, 'ajax_get_history'));
+            add_action('wp_ajax_nopriv_brilli_wim_get_history', array($this, 'ajax_get_history'));
+            add_action('wp_ajax_brilli_wim_clear_history', array($this, 'ajax_clear_history'));
             add_shortcode(self::SHORTCODE, array($this, 'render_shortcode'));
             add_shortcode(self::SHORTCODE_ALIAS, array($this, 'render_shortcode'));
         }
@@ -80,6 +89,191 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             if (false === get_option(self::OPTION_KEY, false)) {
                 add_option(self::OPTION_KEY, self::default_options_static(), '', false);
             }
+
+            self::install_history_table();
+        }
+
+        /**
+         * Return the prefixed history table name.
+         *
+         * @return string
+         */
+        public static function history_table_name() {
+            global $wpdb;
+
+            return $wpdb->prefix . 'brilli_wim_history';
+        }
+
+        /**
+         * Create or upgrade the generation-history table.
+         */
+        public static function install_history_table() {
+            global $wpdb;
+
+            $table_name = self::history_table_name();
+            $charset_collate = $wpdb->get_charset_collate();
+            $sql = "CREATE TABLE {$table_name} (
+                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+                page_id bigint(20) unsigned NOT NULL DEFAULT 0,
+                guest_name varchar(191) NOT NULL,
+                created_at datetime NOT NULL,
+                PRIMARY KEY  (id),
+                KEY page_history (page_id, id)
+            ) {$charset_collate};";
+
+            if (!function_exists('dbDelta')) {
+                require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+            }
+
+            dbDelta($sql);
+            update_option(self::DB_VERSION_OPTION, self::DB_VERSION, false);
+        }
+
+        /**
+         * Ensure active installations receive database upgrades.
+         */
+        public function maybe_upgrade_database() {
+            if (self::DB_VERSION !== get_option(self::DB_VERSION_OPTION, '')) {
+                self::install_history_table();
+            }
+        }
+
+        /**
+         * Read and validate the page ID supplied to a history request.
+         *
+         * @return int
+         */
+        private function get_history_request_page_id() {
+            $page_id = isset($_POST['page_id']) ? absint(wp_unslash($_POST['page_id'])) : 0;
+            $post_status = $page_id ? get_post_status($page_id) : false;
+
+            if (!$page_id || ('publish' !== $post_status && !current_user_can('read_post', $page_id))) {
+                wp_send_json_error(
+                    array('message' => __('Halaman riwayat tidak valid.', 'brilli-wedding-invitation-maker')),
+                    400
+                );
+            }
+
+            check_ajax_referer('brilli_wim_history_' . $page_id, 'nonce');
+
+            return $page_id;
+        }
+
+        /**
+         * Store a generated guest name for the current page.
+         */
+        public function ajax_add_history() {
+            global $wpdb;
+
+            $page_id = $this->get_history_request_page_id();
+            $guest_name = isset($_POST['guest_name']) ? sanitize_text_field(wp_unslash($_POST['guest_name'])) : '';
+
+            if (function_exists('mb_substr')) {
+                $guest_name = mb_substr($guest_name, 0, 191);
+            } else {
+                $guest_name = substr($guest_name, 0, 191);
+            }
+
+            if ('' === $guest_name) {
+                wp_send_json_error(
+                    array('message' => __('Nama tamu tidak boleh kosong.', 'brilli-wedding-invitation-maker')),
+                    400
+                );
+            }
+
+            if (!current_user_can('manage_options') && !empty($_SERVER['REMOTE_ADDR'])) {
+                $remote_address = sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR']));
+                $rate_limit_key = 'brilli_wim_rate_' . md5($page_id . '|' . $remote_address);
+
+                if (get_transient($rate_limit_key)) {
+                    wp_send_json_error(
+                        array('message' => __('Terlalu banyak permintaan. Silakan tunggu sebentar.', 'brilli-wedding-invitation-maker')),
+                        429
+                    );
+                }
+
+                set_transient($rate_limit_key, 1, 1);
+            }
+
+            $inserted = $wpdb->insert(
+                self::history_table_name(),
+                array(
+                    'page_id' => $page_id,
+                    'guest_name' => $guest_name,
+                    'created_at' => current_time('mysql', true),
+                ),
+                array('%d', '%s', '%s')
+            );
+
+            if (false === $inserted) {
+                wp_send_json_error(
+                    array('message' => __('Riwayat gagal disimpan.', 'brilli-wedding-invitation-maker')),
+                    500
+                );
+            }
+
+            wp_send_json_success(array('message' => __('Riwayat berhasil disimpan.', 'brilli-wedding-invitation-maker')));
+        }
+
+        /**
+         * Return one page of shared generation history.
+         */
+        public function ajax_get_history() {
+            global $wpdb;
+
+            $page_id = $this->get_history_request_page_id();
+            $history_page = isset($_POST['history_page']) ? max(1, absint(wp_unslash($_POST['history_page']))) : 1;
+            $offset = ($history_page - 1) * self::HISTORY_PAGE_SIZE;
+            $table_name = self::history_table_name();
+            $total = (int) $wpdb->get_var(
+                $wpdb->prepare("SELECT COUNT(*) FROM {$table_name} WHERE page_id = %d", $page_id)
+            );
+            $rows = $wpdb->get_results(
+                $wpdb->prepare(
+                    "SELECT id, guest_name, created_at FROM {$table_name} WHERE page_id = %d ORDER BY id DESC LIMIT %d OFFSET %d",
+                    $page_id,
+                    self::HISTORY_PAGE_SIZE,
+                    $offset
+                )
+            );
+            $entries = array();
+
+            foreach ($rows as $row) {
+                $timestamp = strtotime($row->created_at . ' UTC');
+                $entries[] = array(
+                    'id' => (int) $row->id,
+                    'name' => $row->guest_name,
+                    'createdAt' => $timestamp ? $timestamp * 1000 : 0,
+                );
+            }
+
+            wp_send_json_success(
+                array(
+                    'entries' => $entries,
+                    'total' => $total,
+                    'page' => $history_page,
+                    'hasMore' => ($offset + count($entries)) < $total,
+                )
+            );
+        }
+
+        /**
+         * Clear shared history for a page. Administrators only.
+         */
+        public function ajax_clear_history() {
+            global $wpdb;
+
+            $page_id = $this->get_history_request_page_id();
+
+            if (!current_user_can('manage_options')) {
+                wp_send_json_error(
+                    array('message' => __('Anda tidak memiliki izin untuk menghapus riwayat.', 'brilli-wedding-invitation-maker')),
+                    403
+                );
+            }
+
+            $wpdb->delete(self::history_table_name(), array('page_id' => $page_id), array('%d'));
+            wp_send_json_success(array('message' => __('Riwayat berhasil dihapus.', 'brilli-wedding-invitation-maker')));
         }
 
         /**
@@ -573,6 +767,13 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
          */
         public function render_shortcode($_atts) {
             $options = $this->get_options();
+            $page_id = function_exists('get_queried_object_id') ? absint(get_queried_object_id()) : 0;
+
+            if (!$page_id && function_exists('get_the_ID')) {
+                $page_id = absint(get_the_ID());
+            }
+
+            $can_clear_history = function_exists('current_user_can') && current_user_can('manage_options');
 
             wp_enqueue_style(self::STYLE_HANDLE);
             wp_enqueue_script(self::SCRIPT_HANDLE);
@@ -583,6 +784,10 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'urlParam' => sanitize_key($options['url_param']),
                 'customUrlId' => $options['custom_url_id'],
                 'customUrlEn' => $options['custom_url_en'],
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'historyNonce' => wp_create_nonce('brilli_wim_history_' . $page_id),
+                'pageId' => $page_id,
+                'canClearHistory' => $can_clear_history,
                 'messages' => array(
                     'formal' => array(
                         'id' => $options['message_formal_id'],
@@ -609,6 +814,10 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                     'historyClearConfirm' => __('Klik lagi untuk menghapus', 'brilli-wedding-invitation-maker'),
                     'historyCleared' => __('Riwayat berhasil dihapus.', 'brilli-wedding-invitation-maker'),
                     'historyGeneratedAt' => __('Dibuat pada', 'brilli-wedding-invitation-maker'),
+                    'historyLoading' => __('Memuat riwayat…', 'brilli-wedding-invitation-maker'),
+                    'historyLoadMore' => __('Tampilkan lebih banyak', 'brilli-wedding-invitation-maker'),
+                    'historyLoadError' => __('Riwayat belum dapat dimuat. Silakan coba lagi.', 'brilli-wedding-invitation-maker'),
+                    'historySaveError' => __('Undangan berhasil dibuat, tetapi riwayat gagal disimpan.', 'brilli-wedding-invitation-maker'),
                 ),
             );
 
@@ -666,7 +875,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                                 <span><?php esc_html_e('Lihat riwayat', 'brilli-wedding-invitation-maker'); ?></span>
                                 <span class="brilli-wim__history-count" aria-label="<?php esc_attr_e('Jumlah riwayat', 'brilli-wedding-invitation-maker'); ?>">0</span>
                             </button>
-                            <p class="brilli-wim__privacy"><?php esc_html_e('Nama tersimpan sebagai riwayat di browser ini. Nomor WhatsApp tidak disimpan dan data tidak dikirim ke server.', 'brilli-wedding-invitation-maker'); ?></p>
+                            <p class="brilli-wim__privacy"><?php esc_html_e('Nama dan waktu pembuatan disimpan di server serta dapat dilihat pengunjung halaman ini. Nomor WhatsApp tidak disimpan.', 'brilli-wedding-invitation-maker'); ?></p>
                         </div>
                     </div>
 
@@ -795,14 +1004,14 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                     <div class="brilli-wim__history-shell">
                         <header class="brilli-wim__history-header">
                             <div>
-                                <span class="brilli-wim__history-kicker"><?php esc_html_e('Tersimpan lokal', 'brilli-wedding-invitation-maker'); ?></span>
+                                <span class="brilli-wim__history-kicker"><?php esc_html_e('Riwayat bersama', 'brilli-wedding-invitation-maker'); ?></span>
                                 <h3 id="<?php echo esc_attr($wrapper_id); ?>-history-title"><?php esc_html_e('Riwayat nama tamu', 'brilli-wedding-invitation-maker'); ?></h3>
                             </div>
                             <button type="button" class="brilli-wim__history-close" aria-label="<?php esc_attr_e('Tutup riwayat', 'brilli-wedding-invitation-maker'); ?>">×</button>
                         </header>
 
                         <div class="brilli-wim__history-body">
-                            <p id="<?php echo esc_attr($wrapper_id); ?>-history-description" class="brilli-wim__history-description"><?php esc_html_e('Daftar nama yang pernah dibuat melalui perangkat dan browser ini, dari yang terbaru.', 'brilli-wedding-invitation-maker'); ?></p>
+                            <p id="<?php echo esc_attr($wrapper_id); ?>-history-description" class="brilli-wim__history-description"><?php esc_html_e('Daftar nama yang pernah dibuat di halaman ini oleh seluruh pengunjung, dari yang terbaru.', 'brilli-wedding-invitation-maker'); ?></p>
 
                             <div class="brilli-wim__history-summary" aria-live="polite">
                                 <span class="brilli-wim__history-summary-count">0</span>
@@ -810,6 +1019,8 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                             </div>
 
                             <ol class="brilli-wim__history-list"></ol>
+                            <button type="button" class="brilli-wim__history-more" hidden><?php esc_html_e('Tampilkan lebih banyak', 'brilli-wedding-invitation-maker'); ?></button>
+                            <p class="brilli-wim__history-status" aria-live="polite" aria-atomic="true"></p>
                             <div class="brilli-wim__history-empty">
                                 <span aria-hidden="true">✦</span>
                                 <strong><?php esc_html_e('Belum ada riwayat', 'brilli-wedding-invitation-maker'); ?></strong>
@@ -818,8 +1029,10 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         </div>
 
                         <footer class="brilli-wim__history-footer">
-                            <p><?php esc_html_e('Hanya nama dan waktu pembuatan yang disimpan. Riwayat ini tidak tersinkron ke server.', 'brilli-wedding-invitation-maker'); ?></p>
-                            <button type="button" class="brilli-wim__history-clear" disabled><?php esc_html_e('Hapus semua riwayat', 'brilli-wedding-invitation-maker'); ?></button>
+                            <p><?php esc_html_e('Hanya nama dan waktu pembuatan yang disimpan di WordPress. Nomor WhatsApp tidak pernah masuk ke riwayat.', 'brilli-wedding-invitation-maker'); ?></p>
+                            <?php if ($can_clear_history) : ?>
+                                <button type="button" class="brilli-wim__history-clear" disabled><?php esc_html_e('Hapus semua riwayat', 'brilli-wedding-invitation-maker'); ?></button>
+                            <?php endif; ?>
                         </footer>
                     </div>
                 </dialog>
