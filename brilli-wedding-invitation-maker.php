@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.7.0
+ * Version: 1.7.1
  * Requires at least: 5.8
  * Requires PHP: 5.6
  * Author: Brillian AV
@@ -31,7 +31,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
      * Main plugin controller.
      */
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.7.0';
+        const VERSION = '1.7.1';
         const DB_VERSION = '1';
         const DB_VERSION_OPTION = 'brilli_wim_db_version';
         const HISTORY_PAGE_SIZE = 50;
@@ -258,16 +258,16 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
         }
 
         /**
-         * Clear shared history for a page. Administrators only.
+         * Clear shared history for a page. Logged-in users only.
          */
         public function ajax_clear_history() {
             global $wpdb;
 
             $page_id = $this->get_history_request_page_id();
 
-            if (!current_user_can('manage_options')) {
+            if (!is_user_logged_in()) {
                 wp_send_json_error(
-                    array('message' => __('Anda tidak memiliki izin untuk menghapus riwayat.', 'brilli-wedding-invitation-maker')),
+                    array('message' => __('Silakan login untuk menghapus riwayat.', 'brilli-wedding-invitation-maker')),
                     403
                 );
             }
@@ -773,7 +773,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 $page_id = absint(get_the_ID());
             }
 
-            $can_clear_history = function_exists('current_user_can') && current_user_can('manage_options');
+            $can_clear_history = function_exists('is_user_logged_in') && is_user_logged_in();
 
             wp_enqueue_style(self::STYLE_HANDLE);
             wp_enqueue_script(self::SCRIPT_HANDLE);
@@ -787,7 +787,6 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'historyNonce' => wp_create_nonce('brilli_wim_history_' . $page_id),
                 'pageId' => $page_id,
-                'canClearHistory' => $can_clear_history,
                 'messages' => array(
                     'formal' => array(
                         'id' => $options['message_formal_id'],
