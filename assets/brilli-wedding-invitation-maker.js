@@ -9,39 +9,6 @@
         }
     }
 
-    function requestHistory(settings, action, data) {
-        var body = new URLSearchParams();
-
-        body.set('action', action);
-        body.set('nonce', settings.historyNonce || '');
-        body.set('page_id', String(settings.pageId || 0));
-
-        Object.keys(data || {}).forEach(function (key) {
-            body.set(key, String(data[key]));
-        });
-
-        return window.fetch(settings.ajaxUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-            },
-            body: body.toString()
-        }).then(function (response) {
-            if (!response.ok) {
-                throw new Error('History request failed.');
-            }
-
-            return response.json();
-        }).then(function (response) {
-            if (!response || !response.success) {
-                throw new Error(response && response.data && response.data.message ? response.data.message : 'History request failed.');
-            }
-
-            return response.data || {};
-        });
-    }
-
     function encodeGuestName(name) {
         return encodeURIComponent((name || '').trim());
     }
@@ -204,24 +171,6 @@
         var copyButtons = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__copy'));
         var whatsappLinks = Array.prototype.slice.call(wrapper.querySelectorAll('.brilli-wim__whatsapp'));
         var notice = wrapper.querySelector('.brilli-wim__notice');
-        var historyTrigger = wrapper.querySelector('.brilli-wim__history-trigger');
-        var historyCount = wrapper.querySelector('.brilli-wim__history-count');
-        var historyDialog = wrapper.querySelector('.brilli-wim__history-dialog');
-        var historyClose = wrapper.querySelector('.brilli-wim__history-close');
-        var historyList = wrapper.querySelector('.brilli-wim__history-list');
-        var historyEmpty = wrapper.querySelector('.brilli-wim__history-empty');
-        var historySummaryCount = wrapper.querySelector('.brilli-wim__history-summary-count');
-        var historyMore = wrapper.querySelector('.brilli-wim__history-more');
-        var historyStatus = wrapper.querySelector('.brilli-wim__history-status');
-        var historyClear = wrapper.querySelector('.brilli-wim__history-clear');
-        var historyClearTimer = null;
-        var historyClearArmed = false;
-        var historyEntries = [];
-        var historyPage = 1;
-        var historyTotal = 0;
-        var historyHasMore = false;
-        var historyLoading = false;
-        var historyRequest = null;
 
         if (wrapper.getAttribute('data-brilli-wim-initialized') === 'true') {
             return;
@@ -300,198 +249,6 @@
             });
         }
 
-        function formatHistoryTime(timestamp) {
-            var date = new Date(timestamp);
-
-            if (isNaN(date.getTime())) {
-                return '';
-            }
-
-            try {
-                return new Intl.DateTimeFormat('id-ID', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }).format(date);
-            } catch (error) {
-                return date.toLocaleString();
-            }
-        }
-
-        function resetHistoryClear() {
-            historyClearArmed = false;
-
-            if (historyClearTimer) {
-                window.clearTimeout(historyClearTimer);
-                historyClearTimer = null;
-            }
-
-            if (historyClear) {
-                historyClear.textContent = getString('historyClear', 'Hapus semua riwayat');
-            }
-        }
-
-        function renderHistory() {
-            if (historyCount) {
-                historyCount.textContent = String(historyTotal);
-            }
-
-            if (historySummaryCount) {
-                historySummaryCount.textContent = String(historyTotal);
-            }
-
-            if (historyList) {
-                historyList.textContent = '';
-
-                historyEntries.forEach(function (entry, index) {
-                    var item = document.createElement('li');
-                    var number = document.createElement('span');
-                    var details = document.createElement('div');
-                    var guestName = document.createElement('strong');
-                    var generatedAt = document.createElement('time');
-                    var formattedTime = formatHistoryTime(entry.createdAt);
-
-                    number.className = 'brilli-wim__history-number';
-                    number.textContent = index < 9 ? '0' + String(index + 1) : String(index + 1);
-                    details.className = 'brilli-wim__history-details';
-                    guestName.textContent = entry.name;
-                    generatedAt.dateTime = new Date(entry.createdAt).toISOString();
-                    generatedAt.textContent = getString('historyGeneratedAt', 'Dibuat pada') + ' ' + formattedTime;
-
-                    details.appendChild(guestName);
-                    details.appendChild(generatedAt);
-                    item.appendChild(number);
-                    item.appendChild(details);
-                    historyList.appendChild(item);
-                });
-
-                historyList.hidden = historyEntries.length === 0;
-            }
-
-            if (historyEmpty) {
-                historyEmpty.hidden = historyLoading || historyEntries.length > 0;
-            }
-
-            if (historyMore) {
-                historyMore.hidden = !historyHasMore;
-                historyMore.disabled = historyLoading;
-                historyMore.textContent = historyLoading
-                    ? getString('historyLoading', 'Memuat riwayat…')
-                    : getString('historyLoadMore', 'Tampilkan lebih banyak');
-            }
-
-            if (historyClear) {
-                historyClear.disabled = historyLoading || historyTotal === 0;
-            }
-
-            if (!historyTotal) {
-                resetHistoryClear();
-            }
-        }
-
-        function setHistoryStatus(text, state) {
-            if (!historyStatus) {
-                return;
-            }
-
-            historyStatus.textContent = text || '';
-
-            if (text && state) {
-                historyStatus.setAttribute('data-state', state);
-            } else {
-                historyStatus.removeAttribute('data-state');
-            }
-        }
-
-        function fetchHistory(reset) {
-            var requestedPage;
-
-            if (historyLoading || !settings.ajaxUrl || !settings.pageId) {
-                return historyRequest || Promise.resolve();
-            }
-
-            requestedPage = reset ? 1 : historyPage + 1;
-            historyLoading = true;
-            setHistoryStatus(getString('historyLoading', 'Memuat riwayat…'), 'loading');
-            renderHistory();
-
-            historyRequest = requestHistory(settings, 'brilli_wim_get_history', {
-                history_page: requestedPage
-            }).then(function (data) {
-                var receivedEntries = Array.isArray(data.entries) ? data.entries : [];
-
-                historyEntries = reset ? receivedEntries : historyEntries.concat(receivedEntries);
-                historyPage = requestedPage;
-                historyTotal = Number(data.total) || 0;
-                historyHasMore = Boolean(data.hasMore);
-                historyLoading = false;
-                historyRequest = null;
-                setHistoryStatus('', '');
-                renderHistory();
-            }).catch(function () {
-                historyLoading = false;
-                historyRequest = null;
-                setHistoryStatus(getString('historyLoadError', 'Riwayat belum dapat dimuat. Silakan coba lagi.'), 'error');
-                renderHistory();
-            });
-
-            return historyRequest;
-        }
-
-        function saveHistory(name) {
-            if (!settings.ajaxUrl || !settings.pageId) {
-                return Promise.reject(new Error('History endpoint is unavailable.'));
-            }
-
-            return requestHistory(settings, 'brilli_wim_add_history', {
-                guest_name: name
-            }).then(function () {
-                var waitForCurrentRequest = historyRequest || Promise.resolve();
-
-                return waitForCurrentRequest.then(function () {
-                    return fetchHistory(true);
-                });
-            });
-        }
-
-        function openHistory() {
-            if (!historyDialog) {
-                return;
-            }
-
-            fetchHistory(true);
-
-            if (typeof historyDialog.showModal === 'function') {
-                historyDialog.showModal();
-            } else {
-                historyDialog.setAttribute('open', '');
-            }
-
-            if (historyClose) {
-                historyClose.focus();
-            }
-        }
-
-        function closeHistory() {
-            if (!historyDialog) {
-                return;
-            }
-
-            resetHistoryClear();
-
-            if (typeof historyDialog.close === 'function') {
-                historyDialog.close();
-            } else {
-                historyDialog.removeAttribute('open');
-
-                if (historyTrigger) {
-                    historyTrigger.focus();
-                }
-            }
-        }
-
         function generate() {
             var name = nameInput.value.trim();
             var phone = phoneInput.value.trim();
@@ -538,9 +295,6 @@
 
             result.hidden = false;
             setNotice(getString('generated', 'Tiga versi undangan berhasil dibuat dan siap dibagikan.'), 'success');
-            saveHistory(name).catch(function () {
-                setNotice(getString('historySaveError', 'Undangan berhasil dibuat, tetapi riwayat gagal disimpan.'), 'error');
-            });
             scrollToResult();
             return true;
         }
@@ -571,69 +325,6 @@
         });
 
         generateButton.addEventListener('click', generate);
-
-        if (historyTrigger) {
-            historyTrigger.addEventListener('click', openHistory);
-        }
-
-        if (historyClose) {
-            historyClose.addEventListener('click', closeHistory);
-        }
-
-        if (historyDialog) {
-            historyDialog.addEventListener('click', function (event) {
-                if (event.target === historyDialog) {
-                    closeHistory();
-                }
-            });
-
-            historyDialog.addEventListener('close', function () {
-                resetHistoryClear();
-
-                if (historyTrigger) {
-                    historyTrigger.focus();
-                }
-            });
-        }
-
-        if (historyClear) {
-            historyClear.addEventListener('click', function () {
-                if (!historyClearArmed) {
-                    historyClearArmed = true;
-                    historyClear.textContent = getString('historyClearConfirm', 'Klik lagi untuk menghapus');
-                    historyClearTimer = window.setTimeout(resetHistoryClear, 2500);
-                    return;
-                }
-
-                historyLoading = true;
-                renderHistory();
-
-                requestHistory(settings, 'brilli_wim_clear_history', {}).then(function () {
-                    historyEntries = [];
-                    historyPage = 1;
-                    historyTotal = 0;
-                    historyHasMore = false;
-                    historyLoading = false;
-                    resetHistoryClear();
-                    setHistoryStatus('', '');
-                    setNotice(getString('historyCleared', 'Riwayat berhasil dihapus.'), 'success');
-                    renderHistory();
-                }).catch(function () {
-                    historyLoading = false;
-                    resetHistoryClear();
-                    setHistoryStatus(getString('historyLoadError', 'Riwayat belum dapat dimuat. Silakan coba lagi.'), 'error');
-                    renderHistory();
-                });
-            });
-        }
-
-        if (historyMore) {
-            historyMore.addEventListener('click', function () {
-                fetchHistory(false);
-            });
-        }
-
-        fetchHistory(true);
 
         nameInput.addEventListener('input', function () {
             if (nameInput.value.trim()) {
