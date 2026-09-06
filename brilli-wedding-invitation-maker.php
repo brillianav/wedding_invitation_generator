@@ -3,7 +3,7 @@
  * Plugin Name: Wedding Invitation Maker - BRILLI
  * Plugin URI: https://brillianav.com
  * Description: Generate personalized wedding invitation messages, Indonesian and English invitation URLs, and WhatsApp share links from the frontend.
- * Version: 1.7.2
+ * Version: 1.8.0
  * Requires at least: 5.8
  * Requires PHP: 5.6
  * Author: Brillian AV
@@ -31,7 +31,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
      * Main plugin controller.
      */
     class Brilli_Wedding_Invitation_Maker {
-        const VERSION = '1.7.2';
+        const VERSION = '1.8.0';
         const LEGACY_HISTORY_VERSION_OPTION = 'brilli_wim_db_version';
         const OPTION_KEY = 'brilli_wedding_invitation_maker_options';
         const OPTION_GROUP = 'brilli_wedding_invitation_maker_group';
@@ -190,7 +190,7 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
 
             wp_enqueue_style(
                 self::ADMIN_STYLE_HANDLE,
-                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker-admin.css',
+                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker-admin.min.css',
                 array(),
                 self::VERSION
             );
@@ -351,14 +351,14 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
         public function register_assets() {
             wp_register_style(
                 self::STYLE_HANDLE,
-                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker.css',
+                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker.min.css',
                 array(),
                 self::VERSION
             );
 
             wp_register_script(
                 self::SCRIPT_HANDLE,
-                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker.js',
+                BRILLI_WIM_PLUGIN_URL . 'assets/brilli-wedding-invitation-maker.min.js',
                 array(),
                 self::VERSION,
                 true
@@ -374,7 +374,6 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
             }
 
             $options = $this->get_options();
-            $logo_url = BRILLI_WIM_PLUGIN_URL . 'assets/logo-bav-white.png';
             $template_sections = array(
                 'formal' => array(
                     'label' => __('Formal', 'brilli-wedding-invitation-maker'),
@@ -402,7 +401,6 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
 
                 <header class="brilli-wim-admin__hero">
                     <div class="brilli-wim-admin__brand">
-                        <img src="<?php echo esc_url($logo_url); ?>" width="84" height="84" alt="BRILLI">
                         <div>
                             <span class="brilli-wim-admin__eyebrow"><?php esc_html_e('BRILLI tools', 'brilli-wedding-invitation-maker'); ?></span>
                             <h1><?php esc_html_e('Wedding Invitation Maker', 'brilli-wedding-invitation-maker'); ?></h1>
@@ -634,8 +632,6 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                 'casual' => __('Nonformal 1', 'brilli-wedding-invitation-maker'),
                 'warm' => __('Nonformal 2', 'brilli-wedding-invitation-maker'),
             );
-            $hero_image_url = BRILLI_WIM_PLUGIN_URL . 'assets/favicon-wedding.png';
-
             ob_start();
             ?>
             <div id="<?php echo esc_attr($wrapper_id); ?>" class="brilli-wim" data-settings="<?php echo esc_attr(wp_json_encode($settings)); ?>">
@@ -645,9 +641,6 @@ if (!class_exists('Brilli_Wedding_Invitation_Maker')) {
                         <h2><?php esc_html_e('Buat pesan undangan yang terasa personal.', 'brilli-wedding-invitation-maker'); ?></h2>
                         <p><?php esc_html_e('Isi data tamu sekali, lalu pilih gaya pesan dan bahasa yang paling sesuai.', 'brilli-wedding-invitation-maker'); ?></p>
                     </div>
-                    <figure class="brilli-wim__hero-art">
-                        <img src="<?php echo esc_url($hero_image_url); ?>" width="190" height="190" alt="<?php esc_attr_e('Ilustrasi pixel pasangan pengantin', 'brilli-wedding-invitation-maker'); ?>" decoding="async">
-                    </figure>
                 </header>
 
                 <section class="brilli-wim__composer" aria-labelledby="<?php echo esc_attr($wrapper_id); ?>-guest-heading">

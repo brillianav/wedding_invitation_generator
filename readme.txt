@@ -4,7 +4,7 @@ Tags: wedding invitation, whatsapp, shortcode, invitation generator
 Requires at least: 5.8
 Requires PHP: 5.6
 Tested up to: 6.6
-Stable tag: 1.7.2
+Stable tag: 1.8.0
 License: GPLv2 or later
 
 Generate three styles of Indonesian and English wedding invitation messages with dynamic invitation URLs and WhatsApp send buttons.
@@ -33,6 +33,11 @@ Indonesia: https://brillian.my.id/?to={encoded_name}
 English: https://brillian.my.id/en/?to={encoded_name}
 
 == Changelog ==
+
+= 1.8.0 =
+* Removed frontend and admin image assets to reduce transfer and package size.
+* Removed the bundled Plus Jakarta Sans font and now inherits the active theme or Elementor typography.
+* Added minified production builds for frontend CSS, frontend JavaScript, and admin CSS.
 
 = 1.7.2 =
 * Removed generation logging and the frontend history popup.
